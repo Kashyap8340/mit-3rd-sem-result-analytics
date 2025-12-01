@@ -1,5 +1,6 @@
 import { ResultDashboard } from "@/components/ResultDashboard";
 import { GraduationCap } from "lucide-react";
+import { StarryFooter } from "@/components/StarryFooter";
 
 export default function Home() {
   return (
@@ -19,6 +20,7 @@ export default function Home() {
           </div>
         </header>
         <ResultDashboard />
+        <StarryFooter />
       </div>
     </main>
   );
