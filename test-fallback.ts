@@ -1,4 +1,4 @@
-import { fetchStudentResult } from "./src/app/actions.ts";
+import { fetchStudentResult } from "./src/app/actions";
 
 async function testFallback() {
     console.log("Testing CSE (Expect sem '2' to work)");
