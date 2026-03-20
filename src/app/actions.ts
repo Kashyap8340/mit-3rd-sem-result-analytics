@@ -21,7 +21,7 @@ export async function fetchStudentResult(
                     "Accept": "application/json, text/plain, */*",
                     "Referer": "https://beu-bih.ac.in/",
                 },
-                cache: "no-store", // Ensure fresh data
+                next: { revalidate: 86400 }, // Globally cache successful API responses for 24 hours
             });
 
             if (!response.ok) {
@@ -45,4 +45,31 @@ export async function fetchStudentResult(
 
     // If all fallbacks failed, return null
     return null;
+}
+
+export async function fetchClassResults(
+    regNos: string[],
+    year: string,
+    semester: string | string[],
+    examHeld: string
+): Promise<StudentResult[]> {
+    const results: StudentResult[] = [];
+    const BATCH_SIZE = 15; // Safely process rapidly on Vercel without triggering CPU limits or massive rate limits.
+
+    for (let i = 0; i < regNos.length; i += BATCH_SIZE) {
+        const batch = regNos.slice(i, i + BATCH_SIZE);
+        const promises = batch.map((regNo) =>
+            fetchStudentResult(regNo, year, semester, examHeld)
+        );
+
+        const batchResults = await Promise.all(promises);
+
+        batchResults.forEach((res) => {
+            if (res) {
+                results.push(res);
+            }
+        });
+    }
+
+    return results;
 }

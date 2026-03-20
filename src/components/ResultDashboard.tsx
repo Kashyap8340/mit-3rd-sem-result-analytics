@@ -17,7 +17,7 @@ import dynamic from "next/dynamic";
 const ResultTable = dynamic(() => import("@/components/ResultTable").then(mod => mod.ResultTable), { ssr: false });
 const AnalysisSection = dynamic(() => import("@/components/AnalysisSection").then(mod => mod.AnalysisSection), { ssr: false });
 import { BRANCH_DATA, BATCH_CONFIGS, generateRegistrationNumbers } from "@/lib/utils";
-import { fetchStudentResult } from "@/app/actions";
+import { fetchClassResults } from "@/app/actions";
 import { StudentResult } from "@/types";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,40 +61,37 @@ export function ResultDashboard() {
         setActiveTab("table"); // Reset to table view on new fetch
 
         const regNos = generateRegistrationNumbers(branch.code, branch.count, batchConfig.id);
-        // console.log("Generated Registration Numbers:", regNos); // Debug log
         const total = regNos.length;
-        const newResults: StudentResult[] = [];
 
-        // Fetch in batches to avoid overwhelming the server/browser
-        const BATCH_SIZE = 5;
+        // Start a fake progress interval while waiting for the single server action
+        let currentProgress = 5;
+        setProgress(currentProgress);
+        setStatusMessage("Fetching results securely from server cache...");
+        
+        const progressInterval = setInterval(() => {
+            currentProgress += (100 - currentProgress) * 0.15; // Ease towards 95%
+            setProgress(currentProgress);
+        }, 500);
 
-        for (let i = 0; i < total; i += BATCH_SIZE) {
-            const batch = regNos.slice(i, i + BATCH_SIZE);
-            const promises = batch.map((regNo) =>
-                fetchStudentResult(
-                    regNo,
-                    batchConfig.apiYear,
-                    batchConfig.apiSemester,
-                    batchConfig.apiExamHeld
-                )
-            );
-
-            setStatusMessage(`Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}...`);
-
-            const batchResults = await Promise.all(promises);
-
-            batchResults.forEach((res) => {
-                if (res) {
-                    newResults.push(res);
-                }
-            });
-
-            setResults([...newResults]); // Update state incrementally
-            setProgress(((i + batch.length) / total) * 100);
+        try {
+            // Call the bulk fetch server action
+            const allResults = await fetchClassResults(regNos, batchConfig.apiYear, batchConfig.apiSemester, batchConfig.apiExamHeld);
+            
+            clearInterval(progressInterval);
+            setProgress(100);
+            setStatusMessage("Completed!");
+            
+            setResults(allResults);
+        } catch (error) {
+            clearInterval(progressInterval);
+            setProgress(0);
+            setStatusMessage("An error occurred while fetching.");
+        } finally {
+            // Give the UI a moment to show 100% before hiding the progress bar
+            setTimeout(() => {
+                setIsFetching(false);
+            }, 600);
         }
-
-        setIsFetching(false);
-        setStatusMessage("Completed!");
     };
 
     const currentBranch = BRANCH_DATA.find((b) => b.code === selectedBranch);
