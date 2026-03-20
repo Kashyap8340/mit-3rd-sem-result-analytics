@@ -13,7 +13,7 @@ import { StudentResult } from "@/types";
 import { Download } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { cn } from "@/lib/utils";
+import { cn, getCurrentSgpa, getEffectiveCgpa } from "@/lib/utils";
 
 interface ResultTableProps {
     results: StudentResult[];
@@ -21,15 +21,7 @@ interface ResultTableProps {
 }
 
 export function ResultTable({ results, branchName }: ResultTableProps) {
-    // Helper to get effective CGPA (Fallback to SGPA for LE students)
-    const getEffectiveCgpa = (student: StudentResult) => {
-        const rawCgpa = parseFloat(student.cgpa);
-        if (!isNaN(rawCgpa) && rawCgpa > 0) return rawCgpa;
-
-        // Fallback to 3rd sem SGPA (index 2)
-        const sgpa3 = parseFloat(student.sgpa[2] || "0");
-        return !isNaN(sgpa3) ? sgpa3 : 0;
-    };
+    // Helper to get failed papers
 
     // Helper to get failed papers
     const getFailedPapers = (student: StudentResult) => {
@@ -78,14 +70,14 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
                 index + 1,
                 student.redg_no,
                 student.name,
-                student.sgpa[2] || "N/A", // 3rd Sem SGPA
+                getCurrentSgpa(student).toFixed(2) || "N/A", // Current SGPA
                 effectiveCgpa,
                 statusText,
             ];
         });
 
         autoTable(doc, {
-            head: [["Serial No", "Reg No", "Name", "SGPA (3rd Sem)", "CGPA", "Status"]],
+            head: [["Serial No", "Reg No", "Name", "Current SGPA", "CGPA", "Status"]],
             body: tableData,
             startY: 40,
             theme: "grid",
@@ -116,7 +108,7 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
                                 <TableHead className="w-[80px]">Serial</TableHead>
                                 <TableHead>Reg No</TableHead>
                                 <TableHead>Name</TableHead>
-                                <TableHead>SGPA (3rd Sem)</TableHead>
+                                <TableHead>Current SGPA</TableHead>
                                 <TableHead>CGPA</TableHead>
                                 <TableHead>Status</TableHead>
                             </TableRow>
@@ -131,7 +123,7 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
                                         <TableCell className="font-medium">{index + 1}</TableCell>
                                         <TableCell className="font-mono text-xs">{student.redg_no}</TableCell>
                                         <TableCell className="font-medium">{student.name}</TableCell>
-                                        <TableCell>{student.sgpa[2] || "N/A"}</TableCell>
+                                        <TableCell>{getCurrentSgpa(student).toFixed(2) || "N/A"}</TableCell>
                                         <TableCell className="font-bold">{effectiveCgpa}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-col items-start gap-1">

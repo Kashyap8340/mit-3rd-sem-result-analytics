@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentSgpa, getEffectiveCgpa, getSemesterIndex } from "@/lib/utils";
 
 interface AnalysisSectionProps {
     results: StudentResult[];
@@ -87,7 +88,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
 
     results.forEach((student) => {
         // SGPA Dist
-        const sgpa = parseFloat(student.sgpa[2] || "0");
+        const sgpa = getCurrentSgpa(student);
         if (!isNaN(sgpa) && sgpa > 0) {
             totalSgpa += sgpa;
             sgpaCount++;
@@ -104,10 +105,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
         const cgpaVal = parseFloat(student.cgpa);
         let status = student.fail_any;
         if (status !== "PASS") {
-            let effectiveCgpa = cgpaVal;
-            if (isNaN(effectiveCgpa) || effectiveCgpa === 0) {
-                effectiveCgpa = sgpa;
-            }
+            const effectiveCgpa = getEffectiveCgpa(student);
 
             if (effectiveCgpa < 5) status = "FAIL";
             else status = "PROMOTED";
@@ -200,11 +198,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
 
     // 5. Topper Summary (SGPA)
     const toppers = [...results]
-        .sort((a, b) => {
-            const sgpaA = parseFloat(a.sgpa[2] || "0");
-            const sgpaB = parseFloat(b.sgpa[2] || "0");
-            return sgpaB - sgpaA;
-        })
+        .sort((a, b) => getCurrentSgpa(b) - getCurrentSgpa(a))
         .slice(0, 5);
 
     // 6. Topper Summary (CGPA)
@@ -247,12 +241,12 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
     const studentMetrics = useMemo(() => {
         if (!selectedStudent) return null;
 
-        const currentSgpa = parseFloat(selectedStudent.sgpa[2] || "0");
-        const currentCgpa = parseFloat(selectedStudent.cgpa) || currentSgpa;
+        const currentSgpa = getCurrentSgpa(selectedStudent);
+        const currentCgpa = getEffectiveCgpa(selectedStudent);
 
         // Rank Calculation (based on SGPA for current sem context)
         const rank = results
-            .sort((a, b) => (parseFloat(b.sgpa[2] || "0") - parseFloat(a.sgpa[2] || "0")))
+            .sort((a, b) => getCurrentSgpa(b) - getCurrentSgpa(a))
             .findIndex(s => s.redg_no === selectedStudent.redg_no) + 1;
 
         const percentile = ((results.length - rank) / results.length) * 100;
@@ -290,11 +284,15 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
         });
 
         // Trend Data
-        const trendData = [
-            { name: "Sem 1", sgpa: parseFloat(selectedStudent.sgpa[0] || "0") },
-            { name: "Sem 2", sgpa: parseFloat(selectedStudent.sgpa[1] || "0") },
-            { name: "Sem 3", sgpa: parseFloat(selectedStudent.sgpa[2] || "0") },
-        ].filter(d => d.sgpa > 0);
+        const currentSemIdx = getSemesterIndex(selectedStudent.semester);
+        const trendData = [];
+        for (let i = 0; i <= currentSemIdx; i++) {
+            trendData.push({
+                name: `Sem ${i + 1}`,
+                sgpa: parseFloat(selectedStudent.sgpa[i] || "0")
+            });
+        }
+        const filteredTrendData = trendData.filter(d => d.sgpa > 0);
 
         return {
             rank,
@@ -421,7 +419,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                         <TableCell className="font-medium">{index + 1}</TableCell>
                                         <TableCell>{student.redg_no}</TableCell>
                                         <TableCell>{student.name}</TableCell>
-                                        <TableCell className="font-bold text-green-600">{student.sgpa[2]}</TableCell>
+                                        <TableCell className="font-bold text-green-600">{getCurrentSgpa(student).toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -631,7 +629,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <div className="text-2xl font-bold">{studentMetrics.currentSgpa.toFixed(2)}</div>
-                                            <p className="text-xs text-muted-foreground">SGPA (Sem 3)</p>
+                                            <p className="text-xs text-muted-foreground">Current SGPA</p>
                                         </div>
                                         <div>
                                             <div className="text-2xl font-bold text-blue-600">{studentMetrics.currentCgpa.toFixed(2)}</div>

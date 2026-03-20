@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StudentResult } from "@/types";
 import { Users, CheckCircle2, TrendingUp, Activity } from "lucide-react";
+import { getCurrentSgpa, getEffectiveCgpa } from "@/lib/utils";
 
 interface ClassSummaryProps {
     results: StudentResult[];
@@ -25,17 +26,14 @@ export function ClassSummary({ results, totalStudents }: ClassSummaryProps) {
 
     results.forEach((r) => {
         // Stats
-        const sgpa = parseFloat(r.sgpa[2] || "0");
+        const sgpa = getCurrentSgpa(r);
         if (!isNaN(sgpa) && sgpa > 0) {
             totalSgpa += sgpa;
             sgpaCount++;
         }
 
-        // Use effective CGPA logic (fallback to SGPA if CGPA is missing/0)
-        let cgpa = parseFloat(r.cgpa);
-        if (isNaN(cgpa) || cgpa === 0) {
-            cgpa = sgpa; // Fallback
-        }
+        // Use effective CGPA logic
+        const cgpa = getEffectiveCgpa(r);
 
         if (!isNaN(cgpa) && cgpa > 0) {
             totalCgpa += cgpa;
@@ -92,7 +90,7 @@ export function ClassSummary({ results, totalStudents }: ClassSummaryProps) {
                 <CardContent>
                     <div className="text-2xl font-bold">{avgSgpa}</div>
                     <p className="text-xs text-muted-foreground mt-1">
-                        For 3rd Semester
+                        For Current Semester
                     </p>
                 </CardContent>
             </Card>
