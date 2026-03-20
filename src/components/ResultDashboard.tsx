@@ -12,8 +12,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClassSummary } from "@/components/ClassSummary";
-import { ResultTable } from "@/components/ResultTable";
-import { AnalysisSection } from "@/components/AnalysisSection";
+import dynamic from "next/dynamic";
+
+const ResultTable = dynamic(() => import("@/components/ResultTable").then(mod => mod.ResultTable), { ssr: false });
+const AnalysisSection = dynamic(() => import("@/components/AnalysisSection").then(mod => mod.AnalysisSection), { ssr: false });
 import { BRANCH_DATA, BATCH_CONFIGS, generateRegistrationNumbers } from "@/lib/utils";
 import { fetchStudentResult } from "@/app/actions";
 import { StudentResult } from "@/types";
