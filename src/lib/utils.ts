@@ -6,15 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const BRANCH_DATA = [
-    { code: "101", name: "Civil Engineering", count: 65, batchIds: ["23", "23-4", "24"] },
-    { code: "102", name: "Mechanical Engineering", count: 65, batchIds: ["23", "23-4", "24"] },
-    { code: "103", name: "Electrical Engineering", count: 65, batchIds: ["23", "23-4", "24"] },
-    { code: "104", name: "Electronics & Communication Engineering", count: 50, batchIds: ["23", "23-4", "24"] },
-    { code: "105", name: "Computer Science (CSE)", count: 60, batchIds: ["24"] },
-    { code: "106", name: "Information Technology", count: 65, batchIds: ["23", "23-4", "24"] },
+    { code: "101", name: "Civil Engineering", count: 65, batchIds: ["25", "23", "23-4", "24"] },
+    { code: "102", name: "Mechanical Engineering", count: 65, batchIds: ["25", "23", "23-4", "24"] },
+    { code: "103", name: "Electrical Engineering", count: 65, batchIds: ["25", "23", "23-4", "24"] },
+    { code: "104", name: "Electronics & Communication Engineering", count: 50, batchIds: ["25", "23", "23-4", "24"] },
+    { code: "105", name: "Computer Science (CSE)", count: 60, batchIds: ["25", "24"] },
+    { code: "106", name: "Information Technology", count: 65, batchIds: ["25", "23", "23-4", "24"] },
     { code: "107", name: "Chemical Engineering", count: 40, batchIds: ["23", "23-4"] },
-    { code: "117", name: "Biomedical & Robotic Engineering", count: 60, batchIds: ["23", "23-4", "24"] },
-    { code: "165", name: "Chemical Technology (CT)", count: 50, batchIds: ["24"] },
+    { code: "117", name: "Biomedical & Robotic Engineering", count: 60, batchIds: ["25", "23", "23-4", "24"] },
+    { code: "165", name: "Chemical Technology (CT)", count: 50, batchIds: ["25", "24"] },
 ];
 
 export const COLLEGE_CODE = "107"; // MIT Muzaffarpur
@@ -30,6 +30,15 @@ export interface BatchConfig {
 }
 
 export const BATCH_CONFIGS: BatchConfig[] = [
+    {
+        id: "25",
+        label: "2025 Batch (1st Semester)",
+        apiYear: "2025",
+        apiSemester: "I",
+        apiExamHeld: "January/2026",
+        regPrefix: "25",
+        lateralPrefix: "26",
+    },
     {
         id: "24",
         label: "2024 Batch (2nd Semester)",
