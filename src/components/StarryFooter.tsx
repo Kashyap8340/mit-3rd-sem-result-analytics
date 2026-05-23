@@ -4,29 +4,23 @@ import { Sparkles } from 'lucide-react';
 export function StarryFooter() {
     return (
         <footer className="relative flex justify-center py-12 overflow-hidden">
-            <div className="group relative px-8 py-3 bg-slate-900/5 hover:bg-slate-900/10 transition-all duration-500 rounded-full backdrop-blur-sm border border-white/20 shadow-xl overflow-hidden">
+            <div className="group relative px-10 py-4 bg-tertiary border-2 border-border shadow-pop hover:-rotate-2 hover:scale-105 transition-all duration-300 rounded-full overflow-visible">
 
-                {/* Animated background gradient */}
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                <div className="relative flex items-center gap-3">
+                <div className="relative flex items-center gap-4">
                     {/* Left Star */}
-                    <Sparkles className="w-4 h-4 text-yellow-500 animate-[spin_3s_linear_infinite] opacity-70" />
+                    <Sparkles className="w-6 h-6 text-white animate-pulse" strokeWidth={2.5} />
 
-                    <p className="text-base font-medium bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent group-hover:from-indigo-500 group-hover:via-purple-500 group-hover:to-pink-500 transition-all duration-300">
-                        Made by <span className="font-bold">Aditya</span>
+                    <p className="text-xl font-heading font-extrabold text-foreground uppercase tracking-wider">
+                        Made by <span className="text-white bg-accent px-3 py-1 rounded-full border-2 border-border shadow-pop-soft -rotate-3 inline-block">Aditya</span>
                     </p>
 
                     {/* Right Star */}
-                    <Sparkles className="w-4 h-4 text-yellow-500 animate-[spin_3s_linear_infinite_reverse] opacity-70" />
+                    <Sparkles className="w-6 h-6 text-white animate-pulse delay-150" strokeWidth={2.5} />
                 </div>
-
-                {/* Floating particles/stars */}
-                <div className="absolute -top-1 left-1/4 w-1 h-1 bg-blue-400 rounded-full animate-ping opacity-0 group-hover:opacity-100 transition-opacity duration-700 delay-100" />
-                <div className="absolute bottom-1 right-1/4 w-1 h-1 bg-purple-400 rounded-full animate-ping opacity-0 group-hover:opacity-100 transition-opacity duration-700 delay-300" />
+                
+                {/* Decorative floating dots */}
+                <div className="absolute -top-4 -left-2 w-4 h-4 bg-secondary rounded-full border-2 border-border animate-bounce" />
+                <div className="absolute -bottom-2 -right-4 w-6 h-6 bg-quaternary rounded-full border-2 border-border animate-bounce delay-300" />
             </div>
         </footer>
     );

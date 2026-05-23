@@ -16,7 +16,10 @@ import {
     LineChart,
     Line,
     ReferenceLine,
+    AreaChart,
+    Area
 } from "recharts";
+import { StudentAIChat } from "./StudentAIChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Table,
@@ -42,7 +45,7 @@ interface AnalysisSectionProps {
     branchName: string;
 }
 
-const COLORS = ["#22c55e", "#eab308", "#ef4444"]; // Green, Yellow, Red
+const COLORS = ["#34D399", "#FBBF24", "#F472B6"]; // Mint, Yellow, Pink
 
 export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
     const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>("all");
@@ -196,6 +199,24 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
         { name: "College Avg (Est)", sgpa: 7.5 },
     ];
 
+    // 8. Normal Distribution (Bell Curve) Data
+    const bellCurveData = useMemo(() => {
+        if (sgpaCount === 0 || stdDev === 0) return [];
+        
+        const data = [];
+        for (let x = 0; x <= 10; x += 0.1) {
+            const xVal = parseFloat(x.toFixed(1));
+            const exponent = -0.5 * Math.pow((xVal - meanSgpa) / stdDev, 2);
+            const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+            
+            data.push({
+                sgpa: xVal,
+                probability: parseFloat(y.toFixed(4)),
+            });
+        }
+        return data;
+    }, [meanSgpa, stdDev, sgpaCount]);
+
     // 5. Topper Summary (SGPA)
     const toppers = [...results]
         .sort((a, b) => getCurrentSgpa(b) - getCurrentSgpa(a))
@@ -326,7 +347,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                 <XAxis dataKey="name" />
                                 <YAxis />
                                 <Tooltip />
-                                <Bar dataKey="count" fill="#8884d8" name="Students" />
+                                <Bar dataKey="count" fill="#8B5CF6" name="Students" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -346,7 +367,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                     labelLine={false}
                                     label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                                     outerRadius={100}
-                                    fill="#8884d8"
+                                    fill="#8B5CF6"
                                     dataKey="value"
                                 >
                                     {statusData.map((entry, index) => (
@@ -359,6 +380,62 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Extraordinary Bell Curve Row */}
+            {stdDev > 0 && (
+                <Card className="border-2 border-border shadow-pop relative overflow-hidden bg-white">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-secondary rounded-full -translate-y-1/2 translate-x-1/2 opacity-10 pointer-events-none blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent rounded-full translate-y-1/2 -translate-x-1/2 opacity-10 pointer-events-none blur-3xl" />
+                    <CardHeader className="text-center relative z-10 pb-0">
+                        <CardTitle className="text-3xl font-heading font-extrabold uppercase tracking-wide">
+                            Class Performance Curve
+                        </CardTitle>
+                        <p className="text-muted-foreground font-medium">Normal distribution model showing where most students stand</p>
+                    </CardHeader>
+                    <CardContent className="h-[450px] relative z-10 pt-6">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={bellCurveData} margin={{ top: 30, right: 30, left: 20, bottom: 20 }}>
+                                <defs>
+                                    <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#F472B6" stopOpacity={0.6}/>
+                                        <stop offset="95%" stopColor="#F472B6" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} vertical={false} />
+                                <XAxis 
+                                    dataKey="sgpa" 
+                                    type="number" 
+                                    domain={[0, 10]} 
+                                    ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                                    tickLine={false}
+                                    axisLine={{ stroke: '#1E293B', strokeWidth: 2 }}
+                                    tick={{ fontWeight: 'bold' }}
+                                    label={{ value: 'SGPA', position: 'insideBottom', offset: -15, fontWeight: 'bold' }} 
+                                />
+                                <YAxis hide />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold' }}
+                                    labelStyle={{ color: '#8B5CF6' }}
+                                    formatter={(value: any) => [value, 'Probability Density']}
+                                />
+                                <Area 
+                                    type="basis" 
+                                    dataKey="probability" 
+                                    stroke="#F472B6" 
+                                    strokeWidth={4} 
+                                    fillOpacity={1} 
+                                    fill="url(#colorProb)" 
+                                    activeDot={{ r: 8, strokeWidth: 2, stroke: '#1E293B', fill: '#FBBF24' }}
+                                />
+                                <ReferenceLine x={meanSgpa} stroke="#8B5CF6" strokeWidth={3} strokeDasharray="4 4" label={{ value: `MEAN: ${meanSgpa.toFixed(2)}`, position: 'top', fill: '#8B5CF6', fontWeight: 'bold' }} />
+                                {/* Standard Deviation Lines */}
+                                <ReferenceLine x={meanSgpa - stdDev} stroke="#34D399" strokeWidth={2} strokeDasharray="3 3" opacity={0.8} label={{ value: '-1σ', position: 'insideBottomLeft', fill: '#34D399', fontWeight: 'bold' }} />
+                                <ReferenceLine x={meanSgpa + stdDev} stroke="#34D399" strokeWidth={2} strokeDasharray="3 3" opacity={0.8} label={{ value: '+1σ', position: 'insideBottomRight', fill: '#34D399', fontWeight: 'bold' }} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Row 2: Killer Subjects & Branch Comparison */}
             <div className="grid gap-4 md:grid-cols-2">
@@ -373,7 +450,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                 <XAxis type="number" unit="%" />
                                 <YAxis dataKey="name" type="category" width={150} style={{ fontSize: '10px' }} />
                                 <Tooltip />
-                                <Bar dataKey="failRate" fill="#ef4444" name="Failure Rate %" />
+                                <Bar dataKey="failRate" fill="#F472B6" name="Failure Rate %" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -390,7 +467,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                 <XAxis dataKey="name" />
                                 <YAxis domain={[0, 10]} />
                                 <Tooltip />
-                                <Bar dataKey="sgpa" fill="#3b82f6" name="Mean SGPA" />
+                                <Bar dataKey="sgpa" fill="#8B5CF6" name="Mean SGPA" />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -485,7 +562,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                         }
                                         return null;
                                     }} />
-                                    <Bar dataKey="avg" fill="#8b5cf6" name="Avg Marks" />
+                                    <Bar dataKey="avg" fill="#8B5CF6" name="Avg Marks" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>
@@ -543,7 +620,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                                     <XAxis dataKey="name" />
                                                     <YAxis allowDecimals={false} />
                                                     <Tooltip />
-                                                    <Bar dataKey="value" fill="#10b981" name="Students" />
+                                                    <Bar dataKey="value" fill="#34D399" name="Students" />
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
@@ -748,7 +825,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                                 <XAxis dataKey="name" />
                                                 <YAxis domain={[0, 10]} />
                                                 <Tooltip />
-                                                <Line type="monotone" dataKey="sgpa" stroke="#8884d8" strokeWidth={2} />
+                                                <Line type="monotone" dataKey="sgpa" stroke="#8B5CF6" strokeWidth={4} />
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </CardContent>
@@ -782,6 +859,20 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                 </Card>
                             </div>
                         </div>
+                        <StudentAIChat 
+                          studentData={selectedStudent} 
+                          metrics={studentMetrics}
+                          classStats={{
+                            totalStudents: results.length,
+                            meanSgpa,
+                            meanCgpa,
+                            stdDev,
+                            stdDevCgpa,
+                            topperName: toppers[0]?.name,
+                            topperSgpa: toppers[0] ? getCurrentSgpa(toppers[0]) : 0,
+                            branchName,
+                          }}
+                        />
                     </div>
                 ) : (
                     <div className="text-center py-12 border-2 border-dashed rounded-lg">

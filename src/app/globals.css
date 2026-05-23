@@ -11,6 +11,10 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-quaternary: var(--quaternary);
+  --color-quaternary-foreground: var(--quaternary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -25,81 +29,78 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-plus-jakarta-sans), system-ui, sans-serif;
+  --font-heading: var(--font-outfit), system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #FFFDF5;
+  --foreground: #1E293B;
+  --card: #FFFFFF;
+  --card-foreground: #1E293B;
+  --popover: #FFFFFF;
+  --popover-foreground: #1E293B;
+  --primary: #8B5CF6;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F472B6;
+  --secondary-foreground: #1E293B;
+  --tertiary: #FBBF24;
+  --tertiary-foreground: #1E293B;
+  --quaternary: #34D399;
+  --quaternary-foreground: #1E293B;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #8B5CF6;
+  --accent-foreground: #FFFFFF;
+  --destructive: #ef4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #1E293B;
+  --input: #CBD5E1;
+  --ring: #8B5CF6;
+  --chart-1: #8B5CF6;
+  --chart-2: #F472B6;
+  --chart-3: #FBBF24;
+  --chart-4: #34D399;
+  --chart-5: #1E293B;
+  --radius: 16px;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
-  --input: oklch(0.269 0 0);
-  --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.269 0 0);
-  --sidebar-ring: oklch(0.439 0 0);
+  /* In a playful system, dark mode might just be an inverted playful palette. 
+     For now, we map it to standard dark equivalents, though the primary design is light-focused. */
+  --background: #0F172A;
+  --foreground: #F8FAFC;
+  --card: #1E293B;
+  --card-foreground: #F8FAFC;
+  --popover: #1E293B;
+  --popover-foreground: #F8FAFC;
+  --primary: #A78BFA;
+  --primary-foreground: #0F172A;
+  --secondary: #F472B6;
+  --secondary-foreground: #0F172A;
+  --tertiary: #FBBF24;
+  --tertiary-foreground: #0F172A;
+  --quaternary: #34D399;
+  --quaternary-foreground: #0F172A;
+  --muted: #334155;
+  --muted-foreground: #94A3B8;
+  --accent: #A78BFA;
+  --accent-foreground: #0F172A;
+  --destructive: #F87171;
+  --destructive-foreground: #0F172A;
+  --border: #475569;
+  --input: #475569;
+  --ring: #A78BFA;
+  --chart-1: #A78BFA;
+  --chart-2: #F472B6;
+  --chart-3: #FBBF24;
+  --chart-4: #34D399;
+  --chart-5: #F8FAFC;
 }
 
 @layer base {
@@ -112,21 +113,32 @@
   }
 }
 
-@keyframes gradient-xy {
-
-  0%,
-  100% {
-    background-size: 400% 400%;
-    background-position: left center;
+@layer utilities {
+  .shadow-pop {
+    box-shadow: 4px 4px 0px 0px #1E293B;
   }
-
-  50% {
-    background-size: 200% 200%;
-    background-position: right center;
+  .shadow-pop-hover {
+    box-shadow: 6px 6px 0px 0px #1E293B;
+  }
+  .shadow-pop-active {
+    box-shadow: 2px 2px 0px 0px #1E293B;
+  }
+  .shadow-pop-pink {
+    box-shadow: 8px 8px 0px 0px #F472B6;
+  }
+  .shadow-pop-soft {
+    box-shadow: 8px 8px 0px 0px #E2E8F0;
+  }
+  .blob-shape {
+    border-radius: 1rem 1rem 1rem 0;
+  }
+  .blob-arch {
+    border-radius: 9999px 9999px 0 0;
   }
 }
 
-.animate-gradient {
-  background-size: 400% 400%;
-  animation: gradient-xy 15s ease infinite;
+/* Base styling for patterns */
+.pattern-dots {
+  background-image: radial-gradient(#CBD5E1 2px, transparent 2px);
+  background-size: 16px 16px;
 }

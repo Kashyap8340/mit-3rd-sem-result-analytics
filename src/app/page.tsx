@@ -4,23 +4,18 @@ import { StarryFooter } from "@/components/StarryFooter";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 animate-gradient p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <header className="flex flex-col items-center space-y-4 text-center pt-8">
-          <div className="p-4 bg-white rounded-full shadow-lg ring-1 ring-slate-900/5">
-            <GraduationCap className="h-12 w-12 text-indigo-600" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              MIT Result Fetcher
-            </h1>
-            <p className="text-muted-foreground max-w-[600px] mx-auto text-lg">
-              Instantly fetch and analyze class results for MIT Muzaffarpur.
-            </p>
-          </div>
-        </header>
+    <main className="min-h-screen bg-background p-4 md:p-8 relative overflow-hidden pattern-dots">
+      {/* Decorative primitive shapes in the background */}
+      <div className="absolute top-[-10%] left-[-5%] w-64 h-64 bg-tertiary rounded-full mix-blend-multiply opacity-50 blur-sm pointer-events-none" />
+      <div className="absolute top-[20%] right-[-5%] w-72 h-72 bg-secondary rounded-full mix-blend-multiply opacity-30 blur-sm pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[20%] w-96 h-96 bg-quaternary blob-shape mix-blend-multiply opacity-40 blur-sm pointer-events-none" />
+
+      <div className="mx-auto max-w-6xl space-y-12 relative z-10 pt-12 pb-24">
         <ResultDashboard />
-        <StarryFooter />
+        
+        <div className="pt-16">
+          <StarryFooter />
+        </div>
       </div>
     </main>
   );

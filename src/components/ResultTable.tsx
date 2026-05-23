@@ -41,10 +41,11 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
 
     const exportPDF = () => {
         const doc = new jsPDF();
+        const collegeName = results[0]?.college_name || "MIT Muzaffarpur";
 
-        doc.setFontSize(18);
-        doc.text("MIT Muzaffarpur", 14, 22);
         doc.setFontSize(14);
+        doc.text(collegeName, 14, 22);
+        doc.setFontSize(12);
         doc.text(`Result Summary - ${branchName}`, 14, 30);
         doc.setFontSize(10);
         doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 36);
@@ -85,7 +86,8 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
             headStyles: { fillColor: [22, 163, 74] }, // Green header
         });
 
-        doc.save(`MIT_Result_${branchName.replace(/\s+/g, "_")}.pdf`);
+        const prefix = collegeName.toLowerCase().includes("mit") ? "MIT" : "BEU";
+        doc.save(`${prefix}_Result_${branchName.replace(/\s+/g, "_")}.pdf`);
     };
 
     if (results.length === 0) {
@@ -100,7 +102,7 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
                     Export PDF
                 </Button>
             </div>
-            <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+            <div className="rounded-2xl border-2 border-border bg-white shadow-pop overflow-hidden">
                 <div className="max-h-[600px] overflow-auto">
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">

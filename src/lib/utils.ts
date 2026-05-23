@@ -71,24 +71,36 @@ export const BATCH_CONFIGS: BatchConfig[] = [
 export function generateRegistrationNumbers(
     branchCode: string,
     count: number,
-    batchId: string
+    batchId: string,
+    collegeCode = COLLEGE_CODE,
+    customBatchConfig?: BatchConfig,
+    customRange?: { start: number; end: number },
+    customLateralRange?: { start: number; end: number; enabled: boolean }
 ): string[] {
     const regNos: string[] = [];
-    const batchConfig = BATCH_CONFIGS.find(b => b.id === batchId);
+    const batchConfig = customBatchConfig || BATCH_CONFIGS.find(b => b.id === batchId);
     if (!batchConfig) return [];
 
+    const startRoll = customRange?.start ?? 1;
+    const endRoll = customRange?.end ?? count;
+
     // Regular students
-    for (let i = 1; i <= count; i++) {
+    for (let i = startRoll; i <= endRoll; i++) {
         const serial = i.toString().padStart(3, "0");
-        const regNo = `${batchConfig.regPrefix}${branchCode}${COLLEGE_CODE}${serial}`;
+        const regNo = `${batchConfig.regPrefix}${branchCode}${collegeCode}${serial}`;
         regNos.push(regNo);
     }
 
-    // Lateral Entry students (901 - 920)
-    for (let i = 901; i <= 920; i++) {
-        const serial = i.toString();
-        const regNo = `${batchConfig.lateralPrefix}${branchCode}${COLLEGE_CODE}${serial}`;
-        regNos.push(regNo);
+    // Lateral Entry students
+    const latEnabled = customLateralRange ? customLateralRange.enabled : true;
+    if (latEnabled) {
+        const latStart = customLateralRange?.start ?? 901;
+        const latEnd = customLateralRange?.end ?? 920;
+        for (let i = latStart; i <= latEnd; i++) {
+            const serial = i.toString();
+            const regNo = `${batchConfig.lateralPrefix}${branchCode}${collegeCode}${serial}`;
+            regNos.push(regNo);
+        }
     }
 
     return regNos;

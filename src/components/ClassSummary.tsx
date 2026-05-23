@@ -58,50 +58,58 @@ export function ClassSummary({ results, totalStudents }: ClassSummaryProps) {
 
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-all">
+            <Card className="border-t-4 border-t-accent shadow-pop hover:-translate-y-1 transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
-                    <Users className="h-4 w-4 text-blue-500" />
+                    <CardTitle className="text-sm font-bold text-foreground uppercase tracking-wider">Total Students</CardTitle>
+                    <div className="bg-accent/10 p-2 rounded-full border-2 border-border">
+                        <Users className="h-5 w-5 text-accent" strokeWidth={2.5} />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{fetchedCount}</div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <div className="text-4xl font-extrabold font-heading text-foreground">{fetchedCount}</div>
+                    <p className="text-xs text-muted-foreground mt-2 font-medium">
                         Processed Results
                     </p>
                 </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-all">
+            <Card className="border-t-4 border-t-quaternary shadow-pop hover:-translate-y-1 transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Pass Percentage</CardTitle>
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <CardTitle className="text-sm font-bold text-foreground uppercase tracking-wider">Pass Percentage</CardTitle>
+                    <div className="bg-quaternary/10 p-2 rounded-full border-2 border-border">
+                        <CheckCircle2 className="h-5 w-5 text-quaternary" strokeWidth={2.5} />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{passPercentage}%</div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <div className="text-4xl font-extrabold font-heading text-foreground">{passPercentage}%</div>
+                    <p className="text-xs text-muted-foreground mt-2 font-medium">
                         {passedCount} Pass, {backlogCount} Prom, {failedCount} Fail
                     </p>
                 </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-all">
+            <Card className="border-t-4 border-t-secondary shadow-pop hover:-translate-y-1 transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Average SGPA</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-purple-500" />
+                    <CardTitle className="text-sm font-bold text-foreground uppercase tracking-wider">Average SGPA</CardTitle>
+                    <div className="bg-secondary/10 p-2 rounded-full border-2 border-border">
+                        <TrendingUp className="h-5 w-5 text-secondary" strokeWidth={2.5} />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{avgSgpa}</div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <div className="text-4xl font-extrabold font-heading text-foreground">{avgSgpa}</div>
+                    <p className="text-xs text-muted-foreground mt-2 font-medium">
                         For Current Semester
                     </p>
                 </CardContent>
             </Card>
-            <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-all">
+            <Card className="border-t-4 border-t-tertiary shadow-pop hover:-translate-y-1 transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Average CGPA</CardTitle>
-                    <Activity className="h-4 w-4 text-orange-500" />
+                    <CardTitle className="text-sm font-bold text-foreground uppercase tracking-wider">Average CGPA</CardTitle>
+                    <div className="bg-tertiary/10 p-2 rounded-full border-2 border-border">
+                        <Activity className="h-5 w-5 text-tertiary" strokeWidth={2.5} />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{avgCgpa}</div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <div className="text-4xl font-extrabold font-heading text-foreground">{avgCgpa}</div>
+                    <p className="text-xs text-muted-foreground mt-2 font-medium">
                         Cumulative Performance
                     </p>
                 </CardContent>
