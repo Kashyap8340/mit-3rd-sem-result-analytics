@@ -107,6 +107,28 @@ function fmt(text: string): React.ReactNode {
   return parts.length > 0 ? parts : text;
 }
 
+// ── Clean Text for PDF to prevent overlapping and encoding issues ──
+function cleanTextForPDF(text: string): string {
+  if (!text) return "";
+  return text
+    // Replace smart quotes/apostrophes
+    .replace(/[\u2018\u2019\u02BC\u02B9]/g, "'") // curly single quotes, modifier apostrophes
+    .replace(/[\u201C\u201D]/g, '"') // curly double quotes
+    // Replace em/en dashes
+    .replace(/[\u2014\u2015]/g, " - ") // em dash
+    .replace(/[\u2013]/g, "-") // en dash
+    // Replace bullet points and middle dots
+    .replace(/[\u2022\u2023\u2043\u204F\u00B7\u2027]/g, "-")
+    // Replace Indian rupee symbol or other currency symbols
+    .replace(/[\u20B9]/g, "Rs. ")
+    // Replace ellipsis
+    .replace(/\u2026/g, "...")
+    // Replace non-breaking space with standard space
+    .replace(/\u00A0/g, " ")
+    // Strip emojis and miscellaneous symbols
+    .replace(/[\u1F600-\u1F64F]|[\u1F300-\u1F5FF]|[\u1F680-\u1F6FF]|[\u1F1E0-\u1F1FF]|[\u2700-\u27BF]|[\u2600-\u26FF]|[\u2300-\u23FF]|[\u2B50-\u2B55]|[\u2934-\u2935]|[\u2190-\u21FF]|[\uD800-\uDBFF][\uDC00-\uDFFF]|\u200D/g, "");
+}
+
 // ── PDF Generator ──────────────────────────────────────────────────
 function generatePDF(
   content: string,
@@ -120,6 +142,12 @@ function generatePDF(
   const margin = 18;
   const contentW = W - margin * 2;
   let y = 0;
+
+  // Safe string cleanups
+  const safeStudentName = cleanTextForPDF(studentData?.name || 'Student');
+  const safeCollegeName = cleanTextForPDF(studentData?.college_name || 'MIT Muzaffarpur');
+  const safeBranchName = cleanTextForPDF(classStats.branchName || 'Unknown Branch');
+  const safeTopperName = cleanTextForPDF(classStats.topperName || 'N/A');
 
   // ── Colors
   const accent: [number, number, number] = [139, 92, 246];    // Violet
@@ -153,7 +181,7 @@ function generatePDF(
     
     // Tokenize
     const tokens: Token[] = [];
-    const rx = /(\*\*[^*]+\*\*|[^\s*]+|\s+)/g;
+    const rx = /(\*\*[^*]+\*\*|\s+|[^\s*]+|\*)/g;
     let match;
     while ((match = rx.exec(textStr)) !== null) {
       const raw = match[0];
@@ -293,13 +321,13 @@ function generatePDF(
   doc.setTextColor(...dark);
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text(studentData?.name || 'Student', margin + 8, y + 9);
+  doc.text(safeStudentName, margin + 8, y + 9);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(`Reg No: ${studentData?.redg_no}  |  College: ${studentData?.college_name || 'MIT Muzaffarpur'}`, margin + 8, y + 16);
-  doc.text(`Branch: ${classStats.branchName}  |  Semester: ${studentData?.semester}`, margin + 8, y + 22);
+  doc.text(`Reg No: ${studentData?.redg_no}  |  College: ${safeCollegeName}`, margin + 8, y + 16);
+  doc.text(`Branch: ${safeBranchName}  |  Semester: ${studentData?.semester}`, margin + 8, y + 22);
 
   // Stats row
   const statsY = y + 30;
@@ -329,7 +357,7 @@ function generatePDF(
   //  AI CONTENT RENDERING
   // ══════════════════════════════════════════════════════════════
 
-  const cleanContent = content.replace(/\r/g, '');
+  const cleanContent = cleanTextForPDF(content).replace(/\r/g, '');
   const lines = cleanContent.split('\n');
 
   lines.forEach((line) => {
@@ -448,7 +476,7 @@ function generatePDF(
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
-    doc.text(`BEU Results Analytics · AI Intelligence Report · ${studentData?.name}`, margin, H - 5);
+    doc.text(`BEU Results Analytics - AI Intelligence Report - ${safeStudentName}`, margin, H - 5);
     doc.text(`Page ${p} of ${totalPages}`, W - margin - 20, H - 5);
 
     // Accent line above footer
@@ -457,7 +485,7 @@ function generatePDF(
     doc.line(0, H - 12, W, H - 12);
   }
 
-  doc.save(`AI_Report_${studentData?.name?.replace(/\s+/g, '_')}_${studentData?.redg_no}.pdf`);
+  doc.save(`AI_Report_${safeStudentName.replace(/\s+/g, '_')}_${studentData?.redg_no}.pdf`);
 }
 
 // ── Main Component ─────────────────────────────────────────────────

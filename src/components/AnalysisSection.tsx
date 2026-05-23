@@ -36,9 +36,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentSgpa, getEffectiveCgpa, getSemesterIndex } from "@/lib/utils";
+import { cn, getCurrentSgpa, getEffectiveCgpa, getSemesterIndex } from "@/lib/utils";
 
 interface AnalysisSectionProps {
     results: StudentResult[];
@@ -50,6 +50,14 @@ const COLORS = ["#34D399", "#FBBF24", "#F472B6"]; // Mint, Yellow, Pink
 export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
     const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>("all");
     const [selectedStudentReg, setSelectedStudentReg] = useState<string>("");
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 640);
+        checkMobile();
+        window.addEventListener("resize", checkMobile);
+        return () => window.removeEventListener("resize", checkMobile);
+    }, []);
 
     // 1. SGPA Distribution
     const sgpaDistribution = [
@@ -66,7 +74,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
     let failCount = 0;
 
     // 3. Killer Subjects Analysis
-    const subjectStats: Record<string, { name: string; total: number; failed: number }> = {};
+    const subjectStats: Record<string, { name: string; code: string; total: number; failed: number }> = {};
 
     // 4. Branch Performance (Mean SGPA)
     let totalSgpa = 0;
@@ -130,7 +138,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
         allSubjects.forEach((sub) => {
             // Killer Subjects Stats
             if (!subjectStats[sub.code]) {
-                subjectStats[sub.code] = { name: sub.name, total: 0, failed: 0 };
+                subjectStats[sub.code] = { name: sub.name, code: sub.code, total: 0, failed: 0 };
             }
             subjectStats[sub.code].total++;
             if (sub.grade === "F" || sub.grade === "Absent" || sub.grade === "Fail") {
@@ -178,7 +186,7 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
     const killerSubjects = Object.values(subjectStats)
         .map((s) => ({
             name: s.name,
-            code: s.name,
+            code: s.code || s.name,
             failRate: s.total > 0 ? (s.failed / s.total) * 100 : 0,
         }))
         .sort((a, b) => b.failRate - a.failRate)
@@ -336,26 +344,28 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
 
             {/* Row 1: SGPA Dist & Status */}
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>SGPA Distribution</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">SGPA Distribution</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={sgpaDistribution}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="count" fill="#8B5CF6" name="Students" />
+                            <BarChart data={sgpaDistribution} margin={{ bottom: 10 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <YAxis tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold' }}
+                                />
+                                <Bar dataKey="count" fill="#8B5CF6" name="Students" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>Result Status Breakdown</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Result Status Breakdown</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -364,9 +374,9 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                     data={statusData}
                                     cx="50%"
                                     cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                                    outerRadius={100}
+                                    labelLine={!isMobile}
+                                    label={isMobile ? undefined : ({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                                    outerRadius={isMobile ? 65 : 100}
                                     fill="#8B5CF6"
                                     dataKey="value"
                                 >
@@ -374,7 +384,15 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold' }}
+                                />
+                                <Legend 
+                                    verticalAlign="bottom" 
+                                    height={36} 
+                                    iconType="circle" 
+                                    wrapperStyle={{ fontWeight: 'bold', fontSize: '11px' }}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -387,14 +405,14 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                     <div className="absolute top-0 right-0 w-64 h-64 bg-secondary rounded-full -translate-y-1/2 translate-x-1/2 opacity-10 pointer-events-none blur-3xl" />
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent rounded-full translate-y-1/2 -translate-x-1/2 opacity-10 pointer-events-none blur-3xl" />
                     <CardHeader className="text-center relative z-10 pb-0">
-                        <CardTitle className="text-3xl font-heading font-extrabold uppercase tracking-wide">
+                        <CardTitle className="text-xl sm:text-3xl font-heading font-extrabold uppercase tracking-wide">
                             Class Performance Curve
                         </CardTitle>
-                        <p className="text-muted-foreground font-medium">Normal distribution model showing where most students stand</p>
+                        <p className="text-muted-foreground font-medium text-xs sm:text-sm">Normal distribution model showing where most students stand</p>
                     </CardHeader>
-                    <CardContent className="h-[450px] relative z-10 pt-6">
+                    <CardContent className="h-[280px] sm:h-[450px] relative z-10 pt-6">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={bellCurveData} margin={{ top: 30, right: 30, left: 20, bottom: 20 }}>
+                            <AreaChart data={bellCurveData} margin={{ top: 30, right: 15, left: 15, bottom: 20 }}>
                                 <defs>
                                     <linearGradient id="colorProb" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#F472B6" stopOpacity={0.6}/>
@@ -406,11 +424,11 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                     dataKey="sgpa" 
                                     type="number" 
                                     domain={[0, 10]} 
-                                    ticks={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                                    ticks={isMobile ? [0, 2, 4, 6, 8, 10] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
                                     tickLine={false}
                                     axisLine={{ stroke: '#1E293B', strokeWidth: 2 }}
-                                    tick={{ fontWeight: 'bold' }}
-                                    label={{ value: 'SGPA', position: 'insideBottom', offset: -15, fontWeight: 'bold' }} 
+                                    tick={{ fontWeight: 'bold', fontSize: isMobile ? 10 : 12 }}
+                                    label={{ value: 'SGPA', position: 'insideBottom', offset: -15, fontWeight: 'bold', fontSize: isMobile ? 10 : 12 }} 
                                 />
                                 <YAxis hide />
                                 <Tooltip 
@@ -427,10 +445,48 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                     fill="url(#colorProb)" 
                                     activeDot={{ r: 8, strokeWidth: 2, stroke: '#1E293B', fill: '#FBBF24' }}
                                 />
-                                <ReferenceLine x={meanSgpa} stroke="#8B5CF6" strokeWidth={3} strokeDasharray="4 4" label={{ value: `MEAN: ${meanSgpa.toFixed(2)}`, position: 'top', fill: '#8B5CF6', fontWeight: 'bold' }} />
+                                <ReferenceLine 
+                                    x={meanSgpa} 
+                                    stroke="#8B5CF6" 
+                                    strokeWidth={3} 
+                                    strokeDasharray="4 4" 
+                                    label={{ 
+                                        value: isMobile ? `Mean: ${meanSgpa.toFixed(1)}` : `MEAN: ${meanSgpa.toFixed(2)}`, 
+                                        position: 'top', 
+                                        fill: '#8B5CF6', 
+                                        fontWeight: 'bold',
+                                        fontSize: isMobile ? 10 : 12
+                                    }} 
+                                />
                                 {/* Standard Deviation Lines */}
-                                <ReferenceLine x={meanSgpa - stdDev} stroke="#34D399" strokeWidth={2} strokeDasharray="3 3" opacity={0.8} label={{ value: '-1σ', position: 'insideBottomLeft', fill: '#34D399', fontWeight: 'bold' }} />
-                                <ReferenceLine x={meanSgpa + stdDev} stroke="#34D399" strokeWidth={2} strokeDasharray="3 3" opacity={0.8} label={{ value: '+1σ', position: 'insideBottomRight', fill: '#34D399', fontWeight: 'bold' }} />
+                                <ReferenceLine 
+                                    x={meanSgpa - stdDev} 
+                                    stroke="#34D399" 
+                                    strokeWidth={2} 
+                                    strokeDasharray="3 3" 
+                                    opacity={0.8} 
+                                    label={{ 
+                                        value: '-1σ', 
+                                        position: 'insideBottomLeft', 
+                                        fill: '#34D399', 
+                                        fontWeight: 'bold',
+                                        fontSize: isMobile ? 8 : 11
+                                    }} 
+                                />
+                                <ReferenceLine 
+                                    x={meanSgpa + stdDev} 
+                                    stroke="#34D399" 
+                                    strokeWidth={2} 
+                                    strokeDasharray="3 3" 
+                                    opacity={0.8} 
+                                    label={{ 
+                                        value: '+1σ', 
+                                        position: 'insideBottomRight', 
+                                        fill: '#34D399', 
+                                        fontWeight: 'bold',
+                                        fontSize: isMobile ? 8 : 11
+                                    }} 
+                                />
                             </AreaChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -439,35 +495,56 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
 
             {/* Row 2: Killer Subjects & Branch Comparison */}
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>Top 5 Killer Subjects (Failure Rate)</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Top 5 Killer Subjects (Failure Rate)</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={killerSubjects} margin={{ left: 50 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" unit="%" />
-                                <YAxis dataKey="name" type="category" width={150} style={{ fontSize: '10px' }} />
-                                <Tooltip />
-                                <Bar dataKey="failRate" fill="#F472B6" name="Failure Rate %" />
+                            <BarChart layout="vertical" data={killerSubjects} margin={{ left: isMobile ? 5 : 20, right: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                <XAxis type="number" unit="%" tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <YAxis 
+                                    dataKey="code" 
+                                    type="category" 
+                                    width={isMobile ? 50 : 80} 
+                                    style={{ fontSize: isMobile ? '9px' : '11px', fontWeight: 'bold' }} 
+                                />
+                                <Tooltip content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="bg-white p-3 border-2 border-border shadow-pop-soft rounded-xl text-xs max-w-[250px]">
+                                                <p className="font-extrabold text-accent">{data.code}</p>
+                                                <p className="font-semibold text-slate-700 leading-tight mt-0.5">{data.name}</p>
+                                                <p className="font-heading font-extrabold text-red-500 mt-2 bg-red-50 px-2 py-0.5 border border-red-100 rounded w-fit">
+                                                    Fail Rate: {data.failRate.toFixed(1)}%
+                                                </p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }} />
+                                <Bar dataKey="failRate" fill="#F472B6" name="Failure Rate %" radius={[0, 4, 4, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>Branch Performance (Mean SGPA)</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Branch Performance (Mean SGPA)</CardTitle>
                     </CardHeader>
                     <CardContent className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={branchComparisonData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis domain={[0, 10]} />
-                                <Tooltip />
-                                <Bar dataKey="sgpa" fill="#8B5CF6" name="Mean SGPA" />
+                            <BarChart data={branchComparisonData} margin={{ bottom: 10 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <YAxis domain={[0, 10]} tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold' }}
+                                />
+                                <Bar dataKey="sgpa" fill="#8B5CF6" name="Mean SGPA" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
@@ -476,113 +553,173 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
 
             {/* Row 3: Topper Lists */}
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>Top 5 Students (By SGPA)</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Top 5 Students (By SGPA)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Rank</TableHead>
-                                    <TableHead>Reg No</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>SGPA</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        {isMobile ? (
+                            <div className="space-y-3">
                                 {toppers.map((student, index) => (
-                                    <TableRow key={student.redg_no}>
-                                        <TableCell className="font-medium">{index + 1}</TableCell>
-                                        <TableCell>{student.redg_no}</TableCell>
-                                        <TableCell>{student.name}</TableCell>
-                                        <TableCell className="font-bold text-green-600">{getCurrentSgpa(student).toFixed(2)}</TableCell>
-                                    </TableRow>
+                                    <div key={student.redg_no} className="flex items-center justify-between p-3.5 border-2 border-border rounded-2xl bg-slate-50/50 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <span className={cn(
+                                                "w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold border-2 border-border shadow-pop-soft",
+                                                index === 0 ? "bg-yellow-400 text-black" :
+                                                index === 1 ? "bg-slate-300 text-black" :
+                                                index === 2 ? "bg-amber-600 text-white" :
+                                                "bg-white text-black"
+                                            )}>
+                                                {index + 1}
+                                            </span>
+                                            <div>
+                                                <p className="font-bold text-sm leading-tight text-foreground">{student.name}</p>
+                                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{student.redg_no}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <span className="font-heading font-extrabold text-sm text-green-600 bg-green-50 px-2.5 py-1 border-2 border-green-200 rounded-lg shadow-sm">
+                                                {getCurrentSgpa(student).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        ) : (
+                            <div className="w-full overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="font-bold text-foreground">Rank</TableHead>
+                                            <TableHead className="font-bold text-foreground">Reg No</TableHead>
+                                            <TableHead className="font-bold text-foreground">Name</TableHead>
+                                            <TableHead className="font-bold text-foreground">SGPA</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {toppers.map((student, index) => (
+                                            <TableRow key={student.redg_no}>
+                                                <TableCell className="font-medium">{index + 1}</TableCell>
+                                                <TableCell className="font-mono text-xs">{student.redg_no}</TableCell>
+                                                <TableCell className="font-semibold text-slate-700">{student.name}</TableCell>
+                                                <TableCell className="font-heading font-extrabold text-green-600">{getCurrentSgpa(student).toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-2 border-border shadow-pop bg-white">
                     <CardHeader>
-                        <CardTitle>Top 5 Students (By CGPA)</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Top 5 Students (By CGPA)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Rank</TableHead>
-                                    <TableHead>Reg No</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>CGPA</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        {isMobile ? (
+                            <div className="space-y-3">
                                 {toppersCgpa.map((student, index) => (
-                                    <TableRow key={student.redg_no}>
-                                        <TableCell className="font-medium">{index + 1}</TableCell>
-                                        <TableCell>{student.redg_no}</TableCell>
-                                        <TableCell>{student.name}</TableCell>
-                                        <TableCell className="font-bold text-blue-600">{student.cgpa}</TableCell>
-                                    </TableRow>
+                                    <div key={student.redg_no} className="flex items-center justify-between p-3.5 border-2 border-border rounded-2xl bg-slate-50/50 shadow-sm">
+                                        <div className="flex items-center gap-3">
+                                            <span className={cn(
+                                                "w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold border-2 border-border shadow-pop-soft",
+                                                index === 0 ? "bg-yellow-400 text-black" :
+                                                index === 1 ? "bg-slate-300 text-black" :
+                                                index === 2 ? "bg-amber-600 text-white" :
+                                                "bg-white text-black"
+                                            )}>
+                                                {index + 1}
+                                            </span>
+                                            <div>
+                                                <p className="font-bold text-sm leading-tight text-foreground">{student.name}</p>
+                                                <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{student.redg_no}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <span className="font-heading font-extrabold text-sm text-blue-600 bg-blue-50 px-2.5 py-1 border-2 border-blue-200 rounded-lg shadow-sm">
+                                                {(parseFloat(student.cgpa) || 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        ) : (
+                            <div className="w-full overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="font-bold text-foreground">Rank</TableHead>
+                                            <TableHead className="font-bold text-foreground">Reg No</TableHead>
+                                            <TableHead className="font-bold text-foreground">Name</TableHead>
+                                            <TableHead className="font-bold text-foreground">CGPA</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {toppersCgpa.map((student, index) => (
+                                            <TableRow key={student.redg_no}>
+                                                <TableCell className="font-medium">{index + 1}</TableCell>
+                                                <TableCell className="font-mono text-xs">{student.redg_no}</TableCell>
+                                                <TableCell className="font-semibold text-slate-700">{student.name}</TableCell>
+                                                <TableCell className="font-heading font-extrabold text-blue-600">{(parseFloat(student.cgpa) || 0).toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
 
             {/* Row 4: Subject Wise Performance */}
-            <div>
-                <h3 className="text-xl font-bold mb-4">Subject Wise Performance</h3>
+            <div className="space-y-6">
+                <h3 className="text-2xl font-heading font-extrabold uppercase tracking-wide">Subject Wise Performance</h3>
 
                 {/* Comparison Chart */}
-                <div className="mb-8">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Subject Comparison (Average Marks)</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={subjectComparisonData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="name" />
-                                    <YAxis domain={[0, 100]} />
-                                    <Tooltip content={({ active, payload, label }) => {
-                                        if (active && payload && payload.length) {
-                                            const data = payload[0].payload;
-                                            return (
-                                                <div className="bg-white p-2 border rounded shadow-sm text-sm">
-                                                    <p className="font-bold">{data.fullName}</p>
-                                                    <p>Code: {label}</p>
-                                                    <p>Avg: {data.avg}</p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    }} />
-                                    <Bar dataKey="avg" fill="#8B5CF6" name="Avg Marks" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                </div>
+                <Card className="border-2 border-border shadow-pop bg-white">
+                    <CardHeader>
+                        <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Subject Comparison (Average Marks)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={subjectComparisonData} margin={{ bottom: 10 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <YAxis domain={[0, 100]} tick={{ fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }} />
+                                <Tooltip content={({ active, payload, label }) => {
+                                    if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                            <div className="bg-white p-3 border-2 border-border shadow-pop-soft rounded-xl text-xs max-w-[250px]">
+                                                <p className="font-extrabold text-accent">{label}</p>
+                                                <p className="font-semibold text-slate-700 leading-tight mt-0.5">{data.fullName}</p>
+                                                <p className="font-bold text-slate-900 mt-2">Class Average: {data.avg.toFixed(1)} / 100</p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                }} />
+                                <Bar dataKey="avg" fill="#8B5CF6" name="Avg Marks" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
 
                 {/* Detailed Analysis */}
-                <div>
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold">Detailed Subject Analysis</h3>
+                <div className="space-y-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <h4 className="text-lg sm:text-xl font-heading font-extrabold uppercase text-slate-800">Detailed Subject Analysis</h4>
                         <Select
                             value={selectedSubjectCode}
                             onValueChange={setSelectedSubjectCode}
                         >
-                            <SelectTrigger className="w-[280px]">
+                            <SelectTrigger className="w-full sm:w-[320px] border-2 border-border font-bold bg-white">
                                 <SelectValue placeholder="Select a subject" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="border-2 border-border">
                                 {subjectAnalysis.map((sub) => (
-                                    <SelectItem key={sub.code} value={sub.code}>
+                                    <SelectItem key={sub.code} value={sub.code} className="font-semibold">
                                         {sub.name}
                                     </SelectItem>
                                 ))}
@@ -591,36 +728,41 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                     </div>
 
                     {selectedSubject ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">{selectedSubject.name}</CardTitle>
-                                    <p className="text-xs text-muted-foreground">{selectedSubject.code}</p>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            <Card className="border-2 border-border shadow-pop bg-white">
+                                <CardHeader className="pb-4">
+                                    <CardTitle className="text-lg font-heading font-extrabold text-foreground leading-tight">{selectedSubject.name}</CardTitle>
+                                    <p className="text-xs text-muted-foreground font-mono">{selectedSubject.code}</p>
                                 </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <div className="bg-secondary/20 p-4 rounded-lg text-center">
-                                            <p className="text-sm text-muted-foreground">Average Marks</p>
-                                            <p className="text-2xl font-bold">{selectedSubject.avg.toFixed(1)}</p>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-secondary/15 p-4 border-2 border-secondary/20 rounded-2xl text-center">
+                                            <p className="text-xs font-bold text-muted-foreground uppercase">Average Marks</p>
+                                            <p className="text-3xl font-heading font-extrabold text-secondary mt-1">{selectedSubject.avg.toFixed(1)}</p>
                                         </div>
-                                        <div className="bg-secondary/20 p-4 rounded-lg text-center">
-                                            <p className="text-sm text-muted-foreground">Pass Percentage</p>
-                                            <p className={`text-2xl font-bold ${selectedSubject.passRate < 50 ? "text-red-500" : "text-green-600"}`}>
+                                        <div className="bg-quaternary/15 p-4 border-2 border-quaternary/20 rounded-2xl text-center">
+                                            <p className="text-xs font-bold text-muted-foreground uppercase">Pass Rate</p>
+                                            <p className={cn(
+                                                "text-3xl font-heading font-extrabold mt-1",
+                                                selectedSubject.passRate < 50 ? "text-red-500" : "text-quaternary"
+                                            )}>
                                                 {selectedSubject.passRate.toFixed(1)}%
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <h4 className="text-sm font-semibold mb-3">Grade Distribution</h4>
+                                    <div className="space-y-3">
+                                        <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Grade Distribution</h4>
                                         <div className="h-[200px]">
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={selectedSubject.gradeDist}>
-                                                    <CartesianGrid strokeDasharray="3 3" />
-                                                    <XAxis dataKey="name" />
-                                                    <YAxis allowDecimals={false} />
-                                                    <Tooltip />
-                                                    <Bar dataKey="value" fill="#34D399" name="Students" />
+                                                <BarChart data={selectedSubject.gradeDist} margin={{ bottom: 5 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                                    <XAxis dataKey="name" tick={{ fontSize: isMobile ? 9 : 11, fontWeight: 'bold' }} />
+                                                    <YAxis allowDecimals={false} tick={{ fontSize: isMobile ? 9 : 11, fontWeight: 'bold' }} />
+                                                    <Tooltip 
+                                                        contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold' }}
+                                                    />
+                                                    <Bar dataKey="value" fill="#34D399" name="Students" radius={[3, 3, 0, 0]} />
                                                 </BarChart>
                                             </ResponsiveContainer>
                                         </div>
@@ -628,42 +770,70 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            <Card className="border-2 border-border shadow-pop bg-white">
                                 <CardHeader>
-                                    <CardTitle>Top Performers</CardTitle>
+                                    <CardTitle className="text-lg font-heading font-extrabold uppercase">Top Performers</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-[50px]">Rank</TableHead>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead className="text-right">Marks</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
+                                    {isMobile ? (
+                                        <div className="space-y-2">
                                             {selectedSubject.topPerformers.map((student, idx) => (
-                                                <TableRow key={idx}>
-                                                    <TableCell className="font-medium">
-                                                        <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs ${idx === 0 ? "bg-yellow-100 text-yellow-700" :
-                                                            idx === 1 ? "bg-gray-100 text-gray-700" :
-                                                                idx === 2 ? "bg-orange-50 text-orange-700" :
-                                                                    "bg-slate-100 text-slate-700"
-                                                            }`}>
+                                                <div key={idx} className="flex items-center justify-between p-3 border border-border rounded-xl bg-slate-50/50">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={cn(
+                                                            "w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold border-2 border-border shadow-pop-soft",
+                                                            idx === 0 ? "bg-yellow-400 text-black" :
+                                                            idx === 1 ? "bg-slate-300 text-black" :
+                                                            idx === 2 ? "bg-amber-600 text-white" :
+                                                            "bg-white text-black"
+                                                        )}>
                                                             {idx + 1}
                                                         </span>
-                                                    </TableCell>
-                                                    <TableCell>{student.name}</TableCell>
-                                                    <TableCell className="text-right font-bold">{student.marks}</TableCell>
-                                                </TableRow>
+                                                        <span className="text-sm font-bold text-foreground">{student.name}</span>
+                                                    </div>
+                                                    <span className="font-heading font-extrabold text-sm text-accent bg-accent/5 border border-accent/20 px-2 py-0.5 rounded">
+                                                        {student.marks}
+                                                    </span>
+                                                </div>
                                             ))}
-                                        </TableBody>
-                                    </Table>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full overflow-x-auto">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="w-[50px] font-bold text-foreground">Rank</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Name</TableHead>
+                                                        <TableHead className="text-right font-bold text-foreground">Marks</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {selectedSubject.topPerformers.map((student, idx) => (
+                                                        <TableRow key={idx}>
+                                                            <TableCell className="font-medium">
+                                                                <span className={cn(
+                                                                    "w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold border-2 border-border shadow-pop-soft",
+                                                                    idx === 0 ? "bg-yellow-400 text-black" :
+                                                                    idx === 1 ? "bg-slate-300 text-black" :
+                                                                    idx === 2 ? "bg-amber-600 text-white" :
+                                                                    "bg-white text-black"
+                                                                )}>
+                                                                    {idx + 1}
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell className="font-semibold text-slate-700">{student.name}</TableCell>
+                                                            <TableCell className="text-right font-bold text-accent">{student.marks}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </div>
                     ) : (
-                        <div className="text-center py-12 text-muted-foreground">
+                        <div className="text-center py-12 text-muted-foreground border-2 border-dashed border-border rounded-2xl bg-slate-50/50">
                             Select a subject to view detailed analysis
                         </div>
                     )}
@@ -671,22 +841,22 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
             </div>
 
             {/* Row 5: Individual Student Analytics */}
-            <div className="pt-8 border-t">
-                <div className="flex items-center justify-between mb-6">
+            <div className="pt-8 border-t-2 border-border">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                     <div>
-                        <h3 className="text-2xl font-bold">Individual Student Analytics</h3>
-                        <p className="text-muted-foreground">Detailed performance report and academic history</p>
+                        <h3 className="text-2xl sm:text-3xl font-heading font-extrabold uppercase text-slate-900">Individual Student Analytics</h3>
+                        <p className="text-muted-foreground text-sm font-medium">Detailed performance report and academic history</p>
                     </div>
                     <Select
                         value={selectedStudentReg}
                         onValueChange={setSelectedStudentReg}
                     >
-                        <SelectTrigger className="w-[300px]">
+                        <SelectTrigger className="w-full sm:w-[320px] border-2 border-border font-bold bg-white">
                             <SelectValue placeholder="Select Student by Reg No" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="border-2 border-border">
                             {sortedStudents.map((student) => (
-                                <SelectItem key={student.redg_no} value={student.redg_no.toString()}>
+                                <SelectItem key={student.redg_no} value={student.redg_no.toString()} className="font-semibold">
                                     {student.redg_no} - {student.name}
                                 </SelectItem>
                             ))}
@@ -697,69 +867,80 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                 {selectedStudent && studentMetrics ? (
                     <div className="space-y-6">
                         {/* Snapshot Cards */}
-                        <div className="grid gap-4 md:grid-cols-4">
-                            <Card>
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+                            <Card className="border-2 border-border shadow-pop bg-white">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Current SGPA</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Semester SGPA & CGPA</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <div className="text-2xl font-bold">{studentMetrics.currentSgpa.toFixed(2)}</div>
-                                            <p className="text-xs text-muted-foreground">Current SGPA</p>
+                                            <div className="text-3xl font-heading font-extrabold text-foreground">{studentMetrics.currentSgpa.toFixed(2)}</div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">SGPA</p>
                                         </div>
                                         <div>
-                                            <div className="text-2xl font-bold text-blue-600">{studentMetrics.currentCgpa.toFixed(2)}</div>
-                                            <p className="text-xs text-muted-foreground">CGPA</p>
+                                            <div className="text-3xl font-heading font-extrabold text-blue-600">{studentMetrics.currentCgpa.toFixed(2)}</div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">CGPA</p>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Class Rank</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <div className="text-2xl font-bold">#{studentMetrics.rank}</div>
-                                            <p className="text-xs text-muted-foreground">SGPA Rank</p>
-                                        </div>
-                                        <div>
-                                            <div className="text-2xl font-bold">#{studentMetrics.cgpaRank}</div>
-                                            <p className="text-xs text-muted-foreground">CGPA Rank</p>
-                                        </div>
-                                    </div>
 
-                                </CardContent>
-                            </Card>
-                            <Card>
+                            <Card className="border-2 border-border shadow-pop bg-white">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Z-Score</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Class Rank</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <div className={`text-2xl font-bold ${studentMetrics.zScore >= 0 ? "text-green-600" : "text-red-500"}`}>
+                                            <div className="text-3xl font-heading font-extrabold text-foreground">#{studentMetrics.rank}</div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">SGPA Rank</p>
+                                        </div>
+                                        <div>
+                                            <div className="text-3xl font-heading font-extrabold text-blue-600">#{studentMetrics.cgpaRank}</div>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">CGPA Rank</p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-2 border-border shadow-pop bg-white">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Academic Z-Score</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <div className={cn(
+                                                "text-3xl font-heading font-extrabold",
+                                                studentMetrics.zScore >= 0 ? "text-green-600" : "text-red-500"
+                                            )}>
                                                 {studentMetrics.zScore > 0 ? "+" : ""}{studentMetrics.zScore.toFixed(2)}σ
                                             </div>
-                                            <p className="text-xs text-muted-foreground">SGPA Z-Score</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">SGPA Z</p>
                                         </div>
                                         <div>
-                                            <div className={`text-2xl font-bold ${studentMetrics.zScoreCgpa >= 0 ? "text-blue-600" : "text-red-500"}`}>
+                                            <div className={cn(
+                                                "text-3xl font-heading font-extrabold",
+                                                studentMetrics.zScoreCgpa >= 0 ? "text-blue-600" : "text-red-500"
+                                            )}>
                                                 {studentMetrics.zScoreCgpa > 0 ? "+" : ""}{studentMetrics.zScoreCgpa.toFixed(2)}σ
                                             </div>
-                                            <p className="text-xs text-muted-foreground">CGPA Z-Score</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">CGPA Z</p>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
-                            <Card>
+
+                            <Card className="border-2 border-border shadow-pop bg-white flex flex-col justify-between">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Result Status</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Result Status</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <Badge variant={studentMetrics.statusVariant} className="text-lg">
+                                <CardContent className="flex-1 flex items-center pt-1">
+                                    <Badge 
+                                        variant={studentMetrics.statusVariant} 
+                                        className="text-base font-extrabold py-1.5 px-4 border-2 border-border shadow-pop-soft"
+                                    >
                                         {studentMetrics.displayStatus}
                                     </Badge>
                                 </CardContent>
@@ -767,89 +948,149 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                         </div>
 
                         <div className="grid gap-6 md:grid-cols-3">
-                            {/* Subject Comparison Table */}
-                            <Card className="md:col-span-2">
+                            {/* Subject Comparison Table / Mobile Cards */}
+                            <Card className="md:col-span-2 border-2 border-border shadow-pop bg-white">
                                 <CardHeader>
-                                    <CardTitle>Subject Performance Analysis</CardTitle>
+                                    <CardTitle className="text-xl sm:text-2xl font-heading font-extrabold uppercase">Subject Performance Analysis</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Subject</TableHead>
-                                                <TableHead>Marks</TableHead>
-                                                <TableHead>Grade</TableHead>
-                                                <TableHead>Best Score</TableHead>
-                                                <TableHead>Sem Topper Score</TableHead>
-                                                <TableHead>Class Avg</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
+                                    {isMobile ? (
+                                        <div className="space-y-4">
                                             {studentMetrics.subjectDetails.map((sub, idx) => (
-                                                <TableRow key={idx}>
-                                                    <TableCell className="font-medium">{sub.name}</TableCell>
-                                                    <TableCell>{sub.total}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant={sub.isBacklog ? "destructive" : "outline"}>
+                                                <div key={idx} className={cn(
+                                                    "p-4 border-2 rounded-2xl shadow-sm space-y-3 bg-white",
+                                                    sub.isBacklog ? "border-red-300 bg-red-50/20" : "border-border/60"
+                                                )}>
+                                                    <div className="flex justify-between items-start gap-2 border-b border-slate-100 pb-2">
+                                                        <div>
+                                                            <p className="font-extrabold text-sm leading-tight text-slate-800">{sub.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{sub.code}</p>
+                                                        </div>
+                                                        <Badge variant={sub.isBacklog ? "destructive" : "outline"} className="shrink-0 font-bold border-2">
                                                             {sub.grade}
                                                         </Badge>
-                                                    </TableCell>
-                                                    <TableCell>{sub.bestScore}</TableCell>
-                                                    <TableCell>{sub.semTopperScore}</TableCell>
-                                                    <TableCell>{sub.classAvg.toFixed(1)}</TableCell>
-                                                    <TableCell>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                                                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Marks Obtained</p>
+                                                            <p className="text-sm font-extrabold text-slate-800 mt-0.5">{sub.total}</p>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                                                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Class Average</p>
+                                                            <p className="text-sm font-extrabold text-slate-800 mt-0.5">{sub.classAvg.toFixed(1)}</p>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                                                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Class Best</p>
+                                                            <p className="text-sm font-extrabold text-slate-800 mt-0.5">{sub.bestScore}</p>
+                                                        </div>
+                                                        <div className="bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                                                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">Sem Topper</p>
+                                                            <p className="text-sm font-extrabold text-slate-800 mt-0.5">{sub.semTopperScore}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100/50">
+                                                        <span className="text-muted-foreground font-bold">Relative Performance:</span>
                                                         {sub.diffFromAvg >= 0 ? (
-                                                            <span className="text-green-600 text-xs font-bold">+{sub.diffFromAvg.toFixed(1)} (Above Avg)</span>
+                                                            <span className="text-green-600 font-extrabold bg-green-50 px-2 py-0.5 border border-green-200 rounded-lg text-[10px]">
+                                                                +{sub.diffFromAvg.toFixed(1)} (Above Avg)
+                                                            </span>
                                                         ) : (
-                                                            <span className="text-red-500 text-xs font-bold">{sub.diffFromAvg.toFixed(1)} (Below Avg)</span>
+                                                            <span className="text-red-500 font-extrabold bg-red-50 px-2 py-0.5 border border-red-200 rounded-lg text-[10px]">
+                                                                {sub.diffFromAvg.toFixed(1)} (Below Avg)
+                                                            </span>
                                                         )}
-                                                    </TableCell>
-                                                </TableRow>
+                                                    </div>
+                                                </div>
                                             ))}
-                                        </TableBody>
-                                    </Table>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full overflow-x-auto">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead className="font-bold text-foreground">Subject</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Marks</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Grade</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Best Score</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Sem Topper Score</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Class Avg</TableHead>
+                                                        <TableHead className="font-bold text-foreground">Status</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {studentMetrics.subjectDetails.map((sub, idx) => (
+                                                        <TableRow key={idx} className="hover:bg-slate-50 transition-colors">
+                                                            <TableCell className="font-semibold text-slate-800">{sub.name}</TableCell>
+                                                            <TableCell className="font-mono">{sub.total}</TableCell>
+                                                            <TableCell>
+                                                                <Badge variant={sub.isBacklog ? "destructive" : "outline"} className="font-bold">
+                                                                    {sub.grade}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="font-mono">{sub.bestScore}</TableCell>
+                                                            <TableCell className="font-mono">{sub.semTopperScore}</TableCell>
+                                                            <TableCell className="font-mono">{sub.classAvg.toFixed(1)}</TableCell>
+                                                            <TableCell>
+                                                                {sub.diffFromAvg >= 0 ? (
+                                                                    <span className="text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 border border-green-150 rounded">+{sub.diffFromAvg.toFixed(1)} (Above Avg)</span>
+                                                                ) : (
+                                                                    <span className="text-red-500 text-xs font-bold bg-red-50 px-2 py-0.5 border border-red-150 rounded">{sub.diffFromAvg.toFixed(1)} (Below Avg)</span>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
 
-                            {/* Academic Trend */}
+                            {/* Academic Trend & Summary Verdict */}
                             <div className="space-y-6">
-                                <Card>
+                                <Card className="border-2 border-border shadow-pop bg-white">
                                     <CardHeader>
-                                        <CardTitle>SGPA Trend</CardTitle>
+                                        <CardTitle className="text-lg font-heading font-extrabold uppercase">SGPA Trend</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="h-[200px]">
+                                    <CardContent className="h-[220px] pr-2 pl-0">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={studentMetrics.trendData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" />
-                                                <YAxis domain={[0, 10]} />
-                                                <Tooltip />
-                                                <Line type="monotone" dataKey="sgpa" stroke="#8B5CF6" strokeWidth={4} />
+                                            <LineChart data={studentMetrics.trendData} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                                                <YAxis domain={[0, 10]} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                                                <Tooltip 
+                                                    contentStyle={{ borderRadius: '12px', border: '2px solid #1E293B', boxShadow: '4px 4px 0px #1E293B', fontWeight: 'bold', fontSize: '11px' }}
+                                                />
+                                                <Line type="monotone" dataKey="sgpa" stroke="#8B5CF6" strokeWidth={4} activeDot={{ r: 6, strokeWidth: 2, stroke: '#1E293B' }} />
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </CardContent>
                                 </Card>
 
-                                <Card>
+                                <Card className="border-2 border-border shadow-pop bg-white">
                                     <CardHeader>
-                                        <CardTitle>Summary Verdict</CardTitle>
+                                        <CardTitle className="text-lg font-heading font-extrabold uppercase">Summary Verdict</CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="space-y-2">
-                                            <p className="text-sm">
-                                                <span className="font-bold">Performance: </span>
-                                                {studentMetrics.zScore > 1 ? "Excellent. Consistently performing well above average." :
-                                                    studentMetrics.zScore > 0 ? "Good. Performing above class average." :
-                                                        studentMetrics.zScore > -1 ? "Average. Performance is consistent with the class mean." :
-                                                            "Needs Improvement. Performance is below class average."}
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-slate-700 leading-relaxed">
+                                                <strong className="text-foreground uppercase tracking-wider text-xs block mb-1">Academic Standing:</strong>
+                                                {studentMetrics.zScore > 1 ? "🌟 Excellent. Consistently performing well above average and displaying stellar academic competence." :
+                                                    studentMetrics.zScore > 0 ? "📈 Good. Solid performance, staying comfortably ahead of the class average." :
+                                                        studentMetrics.zScore > -1 ? "⚖️ Average. Academic standing is consistent with the class mean." :
+                                                            "⚠️ Needs Improvement. Performance is below the class average; extra attention is recommended."}
                                             </p>
                                             {studentMetrics.subjectDetails.some(s => s.isBacklog) && (
-                                                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                                                    <p className="text-red-800 font-bold text-sm mb-1">Attention Required:</p>
-                                                    <ul className="list-disc list-inside text-xs text-red-700">
+                                                <div className="mt-4 p-3.5 bg-red-50 border-2 border-red-200 rounded-2xl">
+                                                    <p className="text-red-800 font-extrabold text-xs uppercase tracking-wider mb-2">⚠️ Attention Required:</p>
+                                                    <ul className="space-y-1 text-xs text-red-700 font-semibold list-inside">
                                                         {studentMetrics.subjectDetails.filter(s => s.isBacklog).map(s => (
-                                                            <li key={s.code}>{s.name} ({s.grade})</li>
+                                                            <li key={s.code} className="flex items-center gap-1.5">
+                                                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full shrink-0" />
+                                                                {s.name} ({s.grade})
+                                                            </li>
                                                         ))}
                                                     </ul>
                                                 </div>
@@ -875,8 +1116,8 @@ export function AnalysisSection({ results, branchName }: AnalysisSectionProps) {
                         />
                     </div>
                 ) : (
-                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                        <p className="text-muted-foreground">Select a student from the dropdown above to view their individual analytics report.</p>
+                    <div className="text-center py-12 border-2 border-dashed border-border rounded-2xl bg-slate-50/50">
+                        <p className="text-muted-foreground font-semibold">Select a student from the dropdown above to view their individual analytics report.</p>
                     </div>
                 )}
             </div>

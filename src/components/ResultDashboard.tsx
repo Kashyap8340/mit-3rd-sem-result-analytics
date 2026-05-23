@@ -592,11 +592,11 @@ export function ResultDashboard() {
                         totalStudents={results.length}
                     />
 
-                    <div className="flex justify-center space-x-2 p-2 bg-white border-2 border-border rounded-full w-fit mx-auto shadow-pop-soft">
+                    <div className="flex justify-center space-x-2 p-1.5 bg-white border-2 border-border rounded-full w-fit mx-auto shadow-pop-soft">
                         <button
                             onClick={() => setActiveTab("table")}
                             className={cn(
-                                "px-8 py-3 rounded-full text-sm font-bold transition-all uppercase tracking-wider",
+                                "px-4 sm:px-8 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all uppercase tracking-wider",
                                 activeTab === "table"
                                     ? "bg-accent text-accent-foreground shadow-pop"
                                     : "text-foreground hover:bg-tertiary hover:text-tertiary-foreground"
@@ -607,7 +607,7 @@ export function ResultDashboard() {
                         <button
                             onClick={() => setActiveTab("analytics")}
                             className={cn(
-                                "px-8 py-3 rounded-full text-sm font-bold transition-all uppercase tracking-wider",
+                                "px-4 sm:px-8 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-bold transition-all uppercase tracking-wider",
                                 activeTab === "analytics"
                                     ? "bg-secondary text-secondary-foreground shadow-pop"
                                     : "text-foreground hover:bg-tertiary hover:text-tertiary-foreground"
