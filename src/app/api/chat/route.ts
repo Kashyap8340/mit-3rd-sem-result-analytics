@@ -1,6 +1,21 @@
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("Missing environment variable: OPENROUTER_API_KEY");
+      return new Response(
+        JSON.stringify({ 
+          error: "API Key Configuration Missing. Please set the OPENROUTER_API_KEY environment variable in your Vercel project dashboard." 
+        }), 
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const MODELS = [
       "meta-llama/llama-3.2-3b-instruct:free",
