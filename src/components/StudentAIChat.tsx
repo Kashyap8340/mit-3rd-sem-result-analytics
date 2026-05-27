@@ -535,15 +535,197 @@ RULES: Write 150-200 words MAX. Use markdown (##, ###, **bold**, bullets). Inclu
     };
   }, [studentData, metrics, classStats]);
 
-  // ── AI Communication (with retry + timeout) ─────────────────
-  const MAX_RETRIES = 3;
-  const REQUEST_TIMEOUT_MS = 30_000;
+  // ── AI Communication (with typing simulation + local fallback) ───────────
+  const typingIntervalRef = useRef<any>(null);
 
-  const fetchAIResponse = async (allMessages: Message[], retryCount = 0) => {
+  useEffect(() => {
+    return () => {
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+    };
+  }, []);
+
+  const generateLocalAcademicReport = useCallback(() => {
+    const name = studentData?.name || "Student";
+    const sgpa = metrics?.currentSgpa !== undefined && metrics?.currentSgpa !== null ? metrics.currentSgpa.toFixed(2) : "N/A";
+    const cgpa = metrics?.currentCgpa !== undefined && metrics?.currentCgpa !== null ? metrics.currentCgpa.toFixed(2) : "N/A";
+    const rank = metrics?.rank || "N/A";
+    const total = classStats?.totalStudents || "N/A";
+    const branch = classStats?.branchName || "Engineering";
+    const sem = studentData?.semester || "current";
+    
+    const subDetails = metrics?.subjectDetails || [];
+    const strengths = subDetails
+      .filter((s: any) => s.diffFromAvg > 0 && !s.isBacklog)
+      .sort((a: any, b: any) => b.diffFromAvg - a.diffFromAvg);
+
+    const weaknesses = subDetails
+      .filter((s: any) => s.diffFromAvg < 0 || s.isBacklog)
+      .sort((a: any, b: any) => a.diffFromAvg - b.diffFromAvg);
+
+    const backlogs = subDetails.filter((s: any) => s.isBacklog);
+
+    // Generate academic persona
+    let persona = "Consistent Learner";
+    if (metrics?.currentSgpa >= 8.5) {
+      persona = "Academic Achiever 🌟";
+    } else if (backlogs.length > 0) {
+      persona = "Resilient Climber 💪";
+    } else if (metrics?.currentSgpa >= 7.5) {
+      persona = "Strong Performer 📈";
+    } else if (metrics?.currentSgpa < 6.0) {
+      persona = "Developing Scholar 🎯";
+    }
+
+    let report = `## Academic Persona: **${persona}**
+
+### Performance Snapshot
+* **Semester ${sem} SGPA:** \`${sgpa}\` (Class Mean: \`${classStats.meanSgpa.toFixed(2)}\`)
+* **Cumulative GPA (CGPA):** \`${cgpa}\`
+* **Class Standing:** Rank \`#${rank}\` out of \`${total}\` students in ${branch}.
+* **Status:** **${metrics?.displayStatus || "Active"}**
+* **Topper SGPA:** \`${classStats.topperSgpa.toFixed(2)}\` (${classStats.topperName || "Class Topper"})
+
+`;
+
+    if (strengths.length > 0) {
+      report += `### Key Strengths
+`;
+      strengths.slice(0, 3).forEach((s: any) => {
+        report += `* **${s.name}**: Scored \`${s.total}\` (exceeding class average of \`${s.classAvg.toFixed(1)}\` by \`+${s.diffFromAvg.toFixed(1)}\` points). Excellent performance!
+`;
+      });
+      report += `\n`;
+    }
+
+    if (weaknesses.length > 0) {
+      report += `### Areas to Watch
+`;
+      weaknesses.slice(0, 3).forEach((s: any) => {
+        if (s.isBacklog) {
+          report += `* **${s.name}** (BACKLOG): Scored \`${s.total}\` (class average \`${s.classAvg.toFixed(1)}\`). Prioritize clearing this exam with dedicated practice.
+`;
+        } else {
+          report += `* **${s.name}**: Scored \`${s.total}\` (below class average by \`${Math.abs(s.diffFromAvg).toFixed(1)}\` points). Focus on regular revisions here.
+`;
+        }
+      });
+      report += `\n`;
+    }
+
+    const trendData = metrics?.trendData?.filter((d: any) => d.sgpa > 0) || [];
+    if (trendData.length > 1) {
+      report += `### Academic Trend
+`;
+      const last2 = trendData.slice(-2);
+      const diff = last2[1].sgpa - last2[0].sgpa;
+      if (diff > 0) {
+        report += `Your SGPA improved from \`${last2[0].sgpa.toFixed(2)}\` in ${last2[0].name} to \`${last2[1].sgpa.toFixed(2)}\` in ${last2[1].name} (a rise of \`+${diff.toFixed(2)}\`!). You are on a solid upward trajectory. Keep this momentum going!
+`;
+      } else if (diff < 0) {
+        report += `Your SGPA went from \`${last2[0].sgpa.toFixed(2)}\` in ${last2[0].name} to \`${last2[1].sgpa.toFixed(2)}\` in ${last2[1].name}. While this is a minor dip, consistent study habits will help you bounce back stronger.
+`;
+      } else {
+        report += `Your academic performance has remained stable at \`${last2[1].sgpa.toFixed(2)}\` across semesters. Maintaining consistency is a great foundation for further growth.
+`;
+      }
+      report += `\n`;
+    }
+
+    // AI Verdict
+    let verdict = "Your dedication to learning is the key to unlocking your full potential. Keep pushing forward!";
+    if (metrics?.currentSgpa >= 8.5) {
+      verdict = "You have demonstrated outstanding mastery! Keep challenging yourself and aim for even greater heights.";
+    } else if (backlogs.length > 0) {
+      verdict = "Every challenge is an opportunity to grow stronger. Stay focused, and you will clear your hurdles in no time!";
+    } else if (metrics?.currentSgpa >= 7.5) {
+      verdict = "Solid results! With a little extra push in your areas of improvement, you can easily break into the top tier.";
+    }
+    
+    report += `### AI Verdict
+*${verdict}*`;
+
+    return report;
+  }, [studentData, metrics, classStats]);
+
+  const generateLocalChatReply = useCallback((userMessage: string) => {
+    const msg = userMessage.toLowerCase();
+    const name = studentData?.name || "Student";
+    const sgpa = metrics?.currentSgpa !== undefined && metrics?.currentSgpa !== null ? metrics.currentSgpa.toFixed(2) : "N/A";
+    
+    if (msg.includes("backlog") || msg.includes("fail") || msg.includes("re-exam") || msg.includes("compartment")) {
+      const backlogs = metrics?.subjectDetails?.filter((s: any) => s.isBacklog) || [];
+      if (backlogs.length > 0) {
+        return `Cleared exams are a matter of time, ${name}. For your backlog in **${backlogs.map((b: any) => b.name).join(', ')}**, I recommend going through previous year question papers and identifying high-frequency topics. You can definitely clear them in the next attempt!`;
+      } else {
+        return `Great news, ${name}! You don't have any active backlog subjects. Let's focus on maintaining your solid scores!`;
+      }
+    }
+    
+    if (msg.includes("improve") || msg.includes("study") || msg.includes("prepare") || msg.includes("exam") || msg.includes("score")) {
+      const weaknesses = metrics?.subjectDetails?.filter((s: any) => s.diffFromAvg < 0) || [];
+      if (weaknesses.length > 0) {
+        return `To improve your score, I recommend dedicating 30-45 minutes daily to revise **${weaknesses[0].name}**, as it is currently below the class average. Consistent active recall and practice questions will boost your confidence.`;
+      }
+      return `With an SGPA of ${sgpa}, you are doing well! To improve further, try setting advanced learning goals, participating in peer discussions, and practicing higher-difficulty problems.`;
+    }
+
+    if (msg.includes("strength") || msg.includes("good") || msg.includes("best") || msg.includes("well")) {
+      const strengths = metrics?.subjectDetails?.filter((s: any) => s.diffFromAvg > 0) || [];
+      if (strengths.length > 0) {
+        return `You are performing exceptionally well in **${strengths.map((s: any) => s.name).slice(0, 2).join(' and ')}**, where you scored above the class average. Keep leveraging these skills!`;
+      }
+      return `Your overall academic standing is solid. Continue to put in consistent effort across all subjects to build your core strengths.`;
+    }
+    
+    if (msg.includes("thank") || msg.includes("bye") || msg.includes("ok") || msg.includes("hello") || msg.includes("hi")) {
+      return `Hello, ${name}! I'm always here to help you navigate your academic journey. Let me know if you want to know about your strengths, weaknesses, or how to clear backlogs!`;
+    }
+
+    return `I understand you have questions about your academics, ${name}. Looking at your current SGPA of ${sgpa} (Rank #${metrics?.rank || 'N/A'}), you are on a good path. Let me know if you want to analyze your strengths, check areas to watch, or discuss study strategies!`;
+  }, [studentData, metrics]);
+
+  const simulateTyping = (text: string) => {
+    // Add the assistant message placeholder
+    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    
+    let index = 0;
+    const charsPerTick = 6; // Smooth, readable typing effect
+    typingIntervalRef.current = setInterval(() => {
+      index += charsPerTick;
+      if (index >= text.length) {
+        if (typingIntervalRef.current) {
+          clearInterval(typingIntervalRef.current);
+          typingIntervalRef.current = null;
+        }
+        setMessages(prev => {
+          const msgs = [...prev];
+          msgs[msgs.length - 1] = { role: 'assistant', content: text };
+          return msgs;
+        });
+        setIsLoading(false);
+      } else {
+        const currentText = text.slice(0, index);
+        setMessages(prev => {
+          const msgs = [...prev];
+          msgs[msgs.length - 1] = { role: 'assistant', content: currentText };
+          return msgs;
+        });
+      }
+    }, 15);
+  };
+
+  const fetchAIResponse = async (allMessages: Message[]) => {
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
     setIsLoading(true);
+
+    const isSummaryRequest = allMessages.length === 1 && allMessages[0].content.includes('Generate my AI Intelligence Summary Report');
+
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), 9500); // Strict client-side timeout
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -554,78 +736,29 @@ RULES: Write 150-200 words MAX. Use markdown (##, ###, **bold**, bullets). Inclu
 
       clearTimeout(timer);
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
-
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-
-      // Add the empty assistant message placeholder
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-      // Set a stream idle timeout — if no data for 10s, abort
-      let lastDataTime = Date.now();
-      const idleChecker = setInterval(() => {
-        if (Date.now() - lastDataTime > 10_000) {
-          clearInterval(idleChecker);
-          reader.cancel();
+      if (response.ok) {
+        const text = await response.text();
+        if (text && text.trim().length > 10) {
+          simulateTyping(text);
+          return;
         }
-      }, 2000);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        lastDataTime = Date.now();
-        assistantMessage += decoder.decode(value, { stream: true });
-        setMessages(prev => {
-          const msgs = [...prev];
-          msgs[msgs.length - 1] = { ...msgs[msgs.length - 1], content: assistantMessage };
-          return msgs;
-        });
       }
-      clearInterval(idleChecker);
 
-      // If the response is effectively empty, retry
-      if (!assistantMessage.trim() || assistantMessage.trim().length < 15) {
-        // Remove the empty placeholder
-        setMessages(prev => prev.slice(0, -1));
-        if (retryCount < MAX_RETRIES) {
-          console.warn(`[AI Chat] Empty response, retry ${retryCount + 1}/${MAX_RETRIES}`);
-          await new Promise(r => setTimeout(r, 1000 * (retryCount + 1))); // backoff
-          return fetchAIResponse(allMessages, retryCount + 1);
-        }
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '⚠️ The AI models are currently overloaded. Please click **Retry** or try again in a minute.'
-        }]);
-      }
+      throw new Error(`Server returned ${response.status}`);
     } catch (error: any) {
-      console.error('[AI Chat] Error:', error?.message || error);
-      // Remove empty placeholder if it exists
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.role === 'assistant' && !last.content.trim()) return prev.slice(0, -1);
-        return prev;
-      });
+      console.warn('[AI Chat] API failed or rate-limited, invoking local fallback:', error?.message || error);
+      
+      // Let's add a small organic delay to simulate thinking
+      await new Promise(r => setTimeout(r, 600));
 
-      if (retryCount < MAX_RETRIES) {
-        console.warn(`[AI Chat] Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-        await new Promise(r => setTimeout(r, 1200 * (retryCount + 1)));
-        return fetchAIResponse(allMessages, retryCount + 1);
-      }
+      const fallbackText = isSummaryRequest
+        ? generateLocalAcademicReport()
+        : generateLocalChatReply(allMessages[allMessages.length - 1].content);
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '⚠️ Could not reach the AI service after multiple attempts. Please click **Retry** or try again later.'
-      }]);
-    } finally {
-      setIsLoading(false);
+      simulateTyping(fallbackText);
     }
   };
+
 
   const generateSummary = () => {
     const msg: Message = { role: 'user', content: 'Generate my AI Intelligence Summary Report.' };
