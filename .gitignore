@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# test scripts (may contain secrets)
+test-*.js
+test-*.ts
+
+# logs
+*.log
+*.txt
+!README.md
+
+# agent
+.agent/

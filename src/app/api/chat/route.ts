@@ -1,128 +1,190 @@
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+const MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+  "z-ai/glm-4.5-air:free",
+  "nvidia/nemotron-nano-9b-v2:free",
+  "poolside/laguna-m.1:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "deepseek/deepseek-v4-flash:free",
+  "google/gemma-4-26b-a4b-it:free",
+];
+
+const TIMEOUT_MS = 20_000;
+
+async function tryNonStreaming(
+  apiKey: string,
+  messages: any[],
+  modelName: string
+): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://mit-result.vercel.app",
+        "X-Title": "BEU Results Analytics",
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages,
+        stream: false,
+        max_tokens: 700,
+        temperature: 0.7,
+      }),
+    });
+
+    clearTimeout(timer);
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content;
+    return content && content.trim().length > 20 ? content : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    if (!process.env.OPENROUTER_API_KEY) {
-      console.error("Missing environment variable: OPENROUTER_API_KEY");
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ 
-          error: "API Key Configuration Missing. Please set the OPENROUTER_API_KEY environment variable in your Vercel project dashboard." 
-        }), 
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: "Missing OPENROUTER_API_KEY" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    const MODELS = [
-      "openrouter/free",
-      "meta-llama/llama-3.2-3b-instruct:free",
-      "google/gemma-2-9b-it:free",
-      "qwen/qwen-2.5-7b-instruct:free"
-    ];
-
-    let response: Response | null = null;
-    let lastErrorMsg = "";
-
+    // ── Strategy 1: Try streaming with each model ──────────────
     for (const modelName of MODELS) {
       try {
-        console.log(`Attempting OpenRouter completion with: ${modelName}`);
+        console.log(`[AI] Trying stream: ${modelName}`);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
+          signal: ctrl.signal,
           headers: {
-            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:3000",
+            "HTTP-Referer": "https://mit-result.vercel.app",
             "X-Title": "BEU Results Analytics",
           },
           body: JSON.stringify({
             model: modelName,
-            messages: messages,
+            messages,
             stream: true,
-            max_tokens: 500,
+            max_tokens: 700,
             temperature: 0.7,
           }),
         });
 
-        if (res.ok) {
-          response = res;
-          break; // Success! Exit loop.
-        } else {
-          const errorBody = await res.text();
-          console.warn(`OpenRouter model ${modelName} failed:`, res.status, errorBody);
-          lastErrorMsg = `Model ${modelName} returned status ${res.status}: ${errorBody}`;
+        clearTimeout(timer);
+
+        if (!res.ok) {
+          console.warn(`[AI] ${modelName} HTTP ${res.status}`);
+          continue;
         }
+
+        const reader = res.body?.getReader();
+        if (!reader) continue;
+
+        // Simple pass-through stream that parses SSE
+        const stream = new ReadableStream({
+          async start(controller) {
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let hasContent = false;
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed || !trimmed.startsWith("data: ")) continue;
+                  const data = trimmed.slice(6);
+                  if (data === "[DONE]") continue;
+
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content;
+                    if (content) {
+                      hasContent = true;
+                      controller.enqueue(new TextEncoder().encode(content));
+                    }
+                  } catch {
+                    // skip malformed
+                  }
+                }
+              }
+
+              if (!hasContent) {
+                // Stream produced nothing — signal an error so the client retries
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    "⚠️ Model returned empty. Click **Retry Report** to try again."
+                  )
+                );
+              }
+              controller.close();
+            } catch (err) {
+              console.warn(`[AI] ${modelName} stream error:`, err);
+              controller.error(err);
+            }
+          },
+        });
+
+        console.log(`[AI] ✓ Streaming: ${modelName}`);
+        return new Response(stream, {
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
       } catch (err: any) {
-        console.warn(`Fetch error for model ${modelName}:`, err);
-        lastErrorMsg = err?.message || String(err);
+        console.warn(`[AI] ${modelName} failed:`, err?.message || err);
+        continue;
       }
     }
 
-    if (!response) {
-      console.error("All OpenRouter models failed. Last error:", lastErrorMsg);
-      return new Response(JSON.stringify({ error: `All models failed: ${lastErrorMsg}` }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+    // ── Strategy 2: Non-streaming fallback ─────────────────────
+    console.log("[AI] All streaming failed, trying non-streaming...");
+
+    for (const modelName of MODELS) {
+      console.log(`[AI] Trying non-stream: ${modelName}`);
+      const content = await tryNonStreaming(apiKey, messages, modelName);
+      if (content) {
+        console.log(`[AI] ✓ Non-streaming: ${modelName}`);
+        return new Response(content, {
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return new Response(JSON.stringify({ error: "No response body" }), { status: 500 });
-    }
-
-    const decoder = new TextDecoder();
-
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        try {
-          let buffer = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith("data: ")) continue;
-              const data = trimmed.slice(6);
-              if (data === "[DONE]") continue;
-
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  controller.enqueue(new TextEncoder().encode(content));
-                }
-              } catch {
-                // skip malformed chunks
-              }
-            }
-          }
-          controller.close();
-        } catch (error) {
-          console.error("Stream processing error:", error);
-          controller.error(error);
-        }
-      },
-    });
-
-    return new Response(readableStream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-      },
-    });
+    // ── All failed ─────────────────────────────────────────────
+    console.error("[AI] All models failed");
+    return new Response(
+      "⚠️ All AI models are currently busy. Please click **Retry Report** to try again.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+    );
   } catch (error: any) {
-    console.error("API Route Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("[AI] Fatal:", error);
+    return new Response(
+      "⚠️ An unexpected error occurred. Please click **Retry Report**.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } }
+    );
   }
 }

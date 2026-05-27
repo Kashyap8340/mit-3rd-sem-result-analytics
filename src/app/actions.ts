@@ -92,7 +92,7 @@ export async function fetchClassResults(
     examHeld: string
 ): Promise<StudentResult[]> {
     const results: StudentResult[] = [];
-    const BATCH_SIZE = 15; // Safely process rapidly on Vercel without triggering CPU limits or massive rate limits.
+    const BATCH_SIZE = 25; // Aggressive batching for faster results
 
     for (let i = 0; i < regNos.length; i += BATCH_SIZE) {
         const batch = regNos.slice(i, i + BATCH_SIZE);
@@ -100,11 +100,12 @@ export async function fetchClassResults(
             fetchStudentResult(regNo, year, semester, examHeld)
         );
 
-        const batchResults = await Promise.all(promises);
+        // allSettled so one failure doesn't block the batch
+        const batchResults = await Promise.allSettled(promises);
 
         batchResults.forEach((res) => {
-            if (res) {
-                results.push(res);
+            if (res.status === "fulfilled" && res.value) {
+                results.push(res.value);
             }
         });
     }

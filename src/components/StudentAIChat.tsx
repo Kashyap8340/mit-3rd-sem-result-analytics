@@ -570,24 +570,51 @@ ${weaknesses.length > 0 ? weaknesses.map((s: string) => `- ${s}`).join('\n') : '
     };
   }, [studentData, metrics, classStats]);
 
-  // ── AI Communication ─────────────────────────────────────────
-  const fetchAIResponse = async (allMessages: Message[]) => {
+  // ── AI Communication (with retry + timeout) ─────────────────
+  const MAX_RETRIES = 3;
+  const REQUEST_TIMEOUT_MS = 30_000;
+
+  const fetchAIResponse = async (allMessages: Message[], retryCount = 0) => {
     setIsLoading(true);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [systemPrompt, ...allMessages] })
+        body: JSON.stringify({ messages: [systemPrompt, ...allMessages] }),
+        signal: controller.signal,
       });
-      if (!response.ok) throw new Error('Network response was not ok');
+
+      clearTimeout(timer);
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
       const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader');
+      if (!reader) throw new Error('No response body');
+
       const decoder = new TextDecoder();
       let assistantMessage = '';
+
+      // Add the empty assistant message placeholder
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      // Set a stream idle timeout — if no data for 10s, abort
+      let lastDataTime = Date.now();
+      const idleChecker = setInterval(() => {
+        if (Date.now() - lastDataTime > 10_000) {
+          clearInterval(idleChecker);
+          reader.cancel();
+        }
+      }, 2000);
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        lastDataTime = Date.now();
         assistantMessage += decoder.decode(value, { stream: true });
         setMessages(prev => {
           const msgs = [...prev];
@@ -595,9 +622,41 @@ ${weaknesses.length > 0 ? weaknesses.map((s: string) => `- ${s}`).join('\n') : '
           return msgs;
         });
       }
-    } catch (error) {
-      console.error("AI Error:", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Could not connect to the AI. Please try again.' }]);
+      clearInterval(idleChecker);
+
+      // If the response is effectively empty, retry
+      if (!assistantMessage.trim() || assistantMessage.trim().length < 15) {
+        // Remove the empty placeholder
+        setMessages(prev => prev.slice(0, -1));
+        if (retryCount < MAX_RETRIES) {
+          console.warn(`[AI Chat] Empty response, retry ${retryCount + 1}/${MAX_RETRIES}`);
+          await new Promise(r => setTimeout(r, 1000 * (retryCount + 1))); // backoff
+          return fetchAIResponse(allMessages, retryCount + 1);
+        }
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: '⚠️ The AI models are currently overloaded. Please click **Retry** or try again in a minute.'
+        }]);
+      }
+    } catch (error: any) {
+      console.error('[AI Chat] Error:', error?.message || error);
+      // Remove empty placeholder if it exists
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'assistant' && !last.content.trim()) return prev.slice(0, -1);
+        return prev;
+      });
+
+      if (retryCount < MAX_RETRIES) {
+        console.warn(`[AI Chat] Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+        await new Promise(r => setTimeout(r, 1200 * (retryCount + 1)));
+        return fetchAIResponse(allMessages, retryCount + 1);
+      }
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '⚠️ Could not reach the AI service after multiple attempts. Please click **Retry** or try again later.'
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -741,21 +800,30 @@ ${weaknesses.length > 0 ? weaknesses.map((s: string) => `- ${s}`).join('\n') : '
                       <div className="w-2 h-2 rounded-full bg-tertiary animate-bounce" style={{ animationDelay: '150ms' }} />
                       <div className="w-2 h-2 rounded-full bg-secondary animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <span className="text-xs text-slate-400 ml-1">Analyzing...</span>
+                    <span className="text-xs text-slate-400 ml-1">Analyzing (may take a few seconds)...</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Download CTA after AI response */}
-            {lastAIMessage && !isLoading && (
-              <div className="flex justify-center pt-2 pb-1">
+            {/* Download CTA + Retry after AI response */}
+            {!isLoading && messages.length > 0 && (
+              <div className="flex justify-center gap-2 pt-2 pb-1 flex-wrap">
+                {lastAIMessage && (
+                  <button
+                    onClick={handleDownloadPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-full text-xs font-bold border border-accent/20 transition-colors"
+                  >
+                    <Download size={14} />
+                    Download PDF Report
+                  </button>
+                )}
                 <button
-                  onClick={handleDownloadPDF}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent/10 hover:bg-accent/20 text-accent rounded-full text-xs font-bold border border-accent/20 transition-colors"
+                  onClick={() => { handleReset(); setTimeout(generateSummary, 100); }}
+                  className="flex items-center gap-2 px-4 py-2 bg-quaternary/10 hover:bg-quaternary/20 text-quaternary rounded-full text-xs font-bold border border-quaternary/20 transition-colors"
                 >
-                  <Download size={14} />
-                  Download PDF Report
+                  <RotateCcw size={14} />
+                  Retry Report
                 </button>
               </div>
             )}
