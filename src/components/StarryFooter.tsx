@@ -11,7 +11,7 @@ export function StarryFooter() {
                     <Sparkles className="w-6 h-6 text-white animate-pulse" strokeWidth={2.5} />
 
                     <p className="text-xl font-heading font-extrabold text-foreground uppercase tracking-wider">
-                        Made by <span className="text-white bg-accent px-3 py-1 rounded-full border-2 border-border shadow-pop-soft -rotate-3 inline-block">Aditya</span>
+                        Made by <span className="text-white bg-accent px-3 py-1 rounded-full border-2 border-border shadow-pop-soft -rotate-3 inline-block">Divyanshi</span>
                     </p>
 
                     {/* Right Star */}
