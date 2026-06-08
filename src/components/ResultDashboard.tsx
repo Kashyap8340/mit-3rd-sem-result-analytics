@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 const ResultTable = dynamic(() => import("@/components/ResultTable").then(mod => mod.ResultTable), { ssr: false });
 const AnalysisSection = dynamic(() => import("@/components/AnalysisSection").then(mod => mod.AnalysisSection), { ssr: false });
 import { BRANCH_DATA, BATCH_CONFIGS, generateRegistrationNumbers } from "@/lib/utils";
-import { fetchClassResults } from "@/app/actions";
+import { fetchClassResults, isAutoCaptchaEnabled, fetchStudentWithCaptcha, resolveExamId } from "@/app/actions";
 import { StudentResult } from "@/types";
 import { Loader2, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,10 +33,140 @@ export function ResultDashboard() {
     const [statusMessage, setStatusMessage] = useState("");
     const [activeTab, setActiveTab] = useState<"table" | "analytics">("table");
 
-    // ── Load settings on mount
+    // Token states
+    const [captchaToken, setCaptchaToken] = useState<string>("");
+    const [manualToken, setManualToken] = useState<string>("");
+    const [showManualInput, setShowManualInput] = useState<boolean>(false);
+    const [isAutoCaptcha, setIsAutoCaptcha] = useState<boolean>(false);
+
+    // Multi-step free fetch state
+    const [isMultiStep, setIsMultiStep] = useState<boolean>(false);
+    const [pendingRegs, setPendingRegs] = useState<string[]>([]);
+    const [currentRegIndex, setCurrentRegIndex] = useState<number>(0);
+    const [resolvedExamIdState, setResolvedExamIdState] = useState<string>("");
+    const [multiStepBatchConfig, setMultiStepBatchConfig] = useState<any>(null);
+
+    // ── Load settings and recaptcha on mount
     useEffect(() => {
         setIsMounted(true);
+
+        // Check if server has 2Captcha API key configured
+        isAutoCaptchaEnabled().then((enabled) => {
+            setIsAutoCaptcha(enabled);
+        });
+
+        // Load Google reCAPTCHA script
+        const scriptId = "google-recaptcha-script";
+        if (!document.getElementById(scriptId)) {
+            const script = document.createElement("script");
+            script.id = scriptId;
+            script.src = "https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit";
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+
+        // Define global callback
+        (window as any).onRecaptchaLoad = () => {
+            if (typeof window !== "undefined" && (window as any).grecaptcha) {
+                try {
+                    (window as any).grecaptcha.render("recaptcha-container-dashboard", {
+                        sitekey: "6LccKAMtAAAAAHAqgWYhfhuUiRz_M2r9hbgHhjXf",
+                        callback: (token: string) => {
+                            setCaptchaToken(token);
+                        },
+                        "expired-callback": () => {
+                            setCaptchaToken("");
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error rendering reCAPTCHA:", e);
+                }
+            }
+        };
+
+        // If grecaptcha is already loaded, render it directly
+        if (typeof window !== "undefined" && (window as any).grecaptcha && (window as any).grecaptcha.render) {
+            try {
+                setTimeout(() => {
+                    const container = document.getElementById("recaptcha-container-dashboard");
+                    if (container && container.innerHTML === "") {
+                        (window as any).grecaptcha.render("recaptcha-container-dashboard", {
+                            sitekey: "6LccKAMtAAAAAHAqgWYhfhuUiRz_M2r9hbgHhjXf",
+                            callback: (token: string) => {
+                                setCaptchaToken(token);
+                            },
+                            "expired-callback": () => {
+                                setCaptchaToken("");
+                            }
+                        });
+                    }
+                }, 500);
+            } catch (e) {
+                console.error("Direct reCAPTCHA render error:", e);
+            }
+        }
     }, []);
+
+    // Effect to handle sequential CAPTCHA solving in multi-step mode
+    useEffect(() => {
+        if (isMultiStep && captchaToken && pendingRegs.length > 0 && currentRegIndex < pendingRegs.length && multiStepBatchConfig) {
+            const fetchSingle = async () => {
+                const regNo = pendingRegs[currentRegIndex];
+                setStatusMessage(`Fetching student ${currentRegIndex + 1} of ${pendingRegs.length} (${regNo})...`);
+                
+                const currentCaptchaToken = captchaToken;
+                // Reset captchaToken state immediately so user/Buster can solve the next CAPTCHA
+                setCaptchaToken("");
+                if (typeof window !== "undefined" && (window as any).grecaptcha) {
+                    try {
+                        (window as any).grecaptcha.reset();
+                    } catch (e) {
+                        console.error("Error resetting reCAPTCHA:", e);
+                    }
+                }
+
+                try {
+                    const studentResult = await fetchStudentWithCaptcha(
+                        regNo,
+                        multiStepBatchConfig.apiYear,
+                        multiStepBatchConfig.apiSemester,
+                        multiStepBatchConfig.apiExamHeld,
+                        currentCaptchaToken,
+                        resolvedExamIdState
+                    );
+
+                    if (studentResult) {
+                        setResults((prev) => {
+                            // Avoid duplicates
+                            if (prev.some((r) => r.redg_no === studentResult.redg_no)) {
+                                return prev;
+                            }
+                            return [...prev, studentResult];
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error fetching student ${regNo}:`, error);
+                }
+
+                const nextIndex = currentRegIndex + 1;
+                const progressPercent = (nextIndex / pendingRegs.length) * 100;
+                setProgress(progressPercent);
+
+                if (nextIndex < pendingRegs.length) {
+                    setCurrentRegIndex(nextIndex);
+                    setStatusMessage(`Please solve the CAPTCHA to fetch student ${nextIndex + 1} of ${pendingRegs.length} (${pendingRegs[nextIndex]})`);
+                } else {
+                    // Completed!
+                    setIsMultiStep(false);
+                    setIsFetching(false);
+                    setProgress(100);
+                    setStatusMessage("Completed!");
+                }
+            };
+            fetchSingle();
+        }
+    }, [captchaToken, isMultiStep, pendingRegs, currentRegIndex, resolvedExamIdState, multiStepBatchConfig]);
 
     const handleFetch = async () => {
         if (!selectedBranch || !selectedBatch) return;
@@ -49,17 +179,49 @@ export function ResultDashboard() {
 
         const branch = BRANCH_DATA.find((b) => b.code === selectedBranch);
         const batchConfig = BATCH_CONFIGS.find((b) => b.id === selectedBatch);
-        if (!branch || !batchConfig) return;
+        if (!branch || !batchConfig) {
+            setIsFetching(false);
+            return;
+        }
 
         const regNos = generateRegistrationNumbers(branch.code, branch.count, batchConfig.id);
         const apiYear = batchConfig.apiYear;
         const apiSemester = batchConfig.apiSemester;
         const apiExamHeld = batchConfig.apiExamHeld;
 
+        // Resolve examId first so it is available for verification links in the result table
+        let examId = "";
+        try {
+            examId = await resolveExamId(apiSemester, apiExamHeld);
+            setResolvedExamIdState(examId);
+        } catch (error) {
+            console.error("Failed to resolve examId:", error);
+        }
+
+        // 1. If we are in free, manual/browser CAPTCHA mode (no 2Captcha key and no manual token)
+        if (!isAutoCaptcha && !manualToken) {
+            setPendingRegs(regNos);
+            setMultiStepBatchConfig({
+                apiYear,
+                apiSemester,
+                apiExamHeld
+            });
+            setIsMultiStep(true);
+            setCurrentRegIndex(0);
+
+            if (captchaToken) {
+                setStatusMessage(`Starting fetch: Student 1 of ${regNos.length} (${regNos[0]})...`);
+            } else {
+                setStatusMessage(`Verification Required: Please solve the CAPTCHA to fetch student 1 of ${regNos.length} (${regNos[0]})`);
+            }
+            return;
+        }
+
+        // 2. Existing Auto-Captcha or single Manual Token flow
         // Start a fake progress interval while waiting for the single server action
         let currentProgress = 5;
         setProgress(currentProgress);
-        setStatusMessage("Fetching results securely from server cache...");
+        setStatusMessage(isAutoCaptcha ? "Auto-solving CAPTCHAs in batches..." : "Fetching results securely using manual token...");
         
         const progressInterval = setInterval(() => {
             currentProgress += (100 - currentProgress) * 0.15; // Ease towards 95%
@@ -67,14 +229,27 @@ export function ResultDashboard() {
         }, 500);
 
         try {
-            // Call the bulk fetch server action
-            const allResults = await fetchClassResults(regNos, apiYear, apiSemester, apiExamHeld);
+            // Call the bulk fetch server action with the resolved tokens
+            const allResults = await fetchClassResults(
+                regNos, 
+                apiYear, 
+                apiSemester, 
+                apiExamHeld, 
+                captchaToken, 
+                manualToken
+            );
             
             clearInterval(progressInterval);
             setProgress(100);
             setStatusMessage("Completed!");
             
             setResults(allResults);
+
+            // Reset recaptcha widget for next fetch if captcha was used
+            if (captchaToken && typeof window !== "undefined" && (window as any).grecaptcha) {
+                (window as any).grecaptcha.reset();
+                setCaptchaToken("");
+            }
         } catch (error) {
             clearInterval(progressInterval);
             setProgress(0);
@@ -197,7 +372,7 @@ export function ResultDashboard() {
                         <Button
                             onClick={handleFetch}
                             disabled={!selectedBranch || !selectedBatch || isFetching}
-                            className="h-11 px-8 text-base font-bold transition-all active:scale-95 border-2 border-border shadow-pop bg-accent hover:bg-accent/90"
+                            className="h-11 px-8 text-base font-bold transition-all active:scale-95 border-2 border-border shadow-pop bg-accent hover:bg-accent/90 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {isFetching ? (
                                 <>
@@ -209,16 +384,95 @@ export function ResultDashboard() {
                             )}
                         </Button>
                     </div>
+
+                    <div className="flex flex-col gap-4 border-t-2 border-dashed border-border pt-6 mt-2">
+                        <div className="flex flex-col md:flex-row gap-6 items-center justify-between">
+                            {isAutoCaptcha ? (
+                                <div className="flex-1 w-full flex flex-col items-center justify-center min-h-[120px] bg-accent/5 border-2 border-dashed border-accent/40 rounded-xl p-4 text-center">
+                                    <span className="text-2xl">🤖</span>
+                                    <span className="text-sm font-extrabold text-accent uppercase tracking-wider mt-1">Auto-Captcha Solver Active</span>
+                                    <p className="text-[11px] text-muted-foreground mt-1 font-semibold leading-relaxed">
+                                        Server-side 2Captcha integration is configured. Fetch will proceed automatically with no manual CAPTCHA solving.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="flex-1 w-full flex flex-col items-center justify-center min-h-[120px] bg-muted/20 border-2 border-border rounded-xl p-4">
+                                    <span className="text-xs font-extrabold text-foreground mb-3 uppercase tracking-wider">Verification Required</span>
+                                    <div id="recaptcha-container-dashboard" className="flex justify-center" />
+                                    {captchaToken && (
+                                        <span className="text-xs text-green-600 font-bold mt-2">✓ CAPTCHA Completed</span>
+                                    )}
+                                </div>
+                            )}
+                            
+                            <div className="flex-1 w-full space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-extrabold text-foreground uppercase tracking-wider">Optional: Bypass / Manual Token</span>
+                                    <button 
+                                        type="button"
+                                        onClick={() => setShowManualInput(!showManualInput)}
+                                        className="text-xs font-extrabold text-accent underline hover:text-accent/80 uppercase tracking-wide cursor-pointer"
+                                    >
+                                        {showManualInput ? "Hide Override" : "Use Manual Token"}
+                                    </button>
+                                </div>
+                                {showManualInput ? (
+                                    <div className="space-y-2">
+                                        <Input
+                                            type="text"
+                                            placeholder="Paste result token (from network tab)..."
+                                            value={manualToken}
+                                            onChange={(e) => setManualToken(e.target.value)}
+                                            className="h-11 border-2 border-border font-mono text-xs shadow-[2px_2px_0px_rgba(0,0,0,1)] bg-white focus-visible:ring-0 focus-visible:border-black"
+                                            disabled={isFetching}
+                                        />
+                                        <p className="text-[10px] font-semibold text-muted-foreground leading-normal">
+                                            How to get: Go to the <a href="https://beu-bih.ac.in/" target="_blank" rel="noopener noreferrer" className="underline text-accent">BEU Website</a>, solve the captcha, and click search. Open Developer Tools (F12) &gt; Network tab. Look for a request named <code className="bg-muted px-1 py-0.5 rounded">get-result</code> and copy the <code className="bg-muted px-1 py-0.5 rounded">token</code> value from its query parameters.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs font-semibold text-muted-foreground leading-relaxed">
+                                        {isAutoCaptcha 
+                                            ? "Automatic bypass mode is enabled. No manual actions are required from your side."
+                                            : "Solving the CAPTCHA is required to exchange and fetch results securely from the BEU backend. If domain constraints prevent the widget from loading, click the button above to paste a manual token."}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
 
             {isFetching && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex justify-between text-sm font-medium text-muted-foreground">
-                        <span>{statusMessage}</span>
-                        <span>{Math.round(progress)}%</span>
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm font-medium text-muted-foreground gap-2">
+                        <span className="font-bold text-foreground">{statusMessage}</span>
+                        <span className="font-mono bg-muted border border-border px-2 py-0.5 rounded text-xs w-fit">{Math.round(progress)}%</span>
                     </div>
-                    <Progress value={progress} className="h-3" />
+                    <Progress value={progress} className="h-3 border-2 border-border" />
+                    {isMultiStep && (
+                        <div className="flex justify-end pt-1">
+                            <Button 
+                                type="button"
+                                variant="destructive"
+                                onClick={() => {
+                                    setIsMultiStep(false);
+                                    setIsFetching(false);
+                                    setStatusMessage("Fetching stopped by user.");
+                                    if (typeof window !== "undefined" && (window as any).grecaptcha) {
+                                        try {
+                                            (window as any).grecaptcha.reset();
+                                        } catch (e) {
+                                            console.error("Error resetting reCAPTCHA:", e);
+                                        }
+                                    }
+                                }}
+                                className="h-9 px-4 font-bold border-2 border-border shadow-pop bg-red-500 hover:bg-red-600 text-white transition-all active:scale-95"
+                            >
+                                Stop Fetching
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -258,6 +512,7 @@ export function ResultDashboard() {
                         <ResultTable
                             results={results}
                             branchName={dynamicBranchName}
+                            examId={resolvedExamIdState}
                         />
                     ) : (
                         <AnalysisSection

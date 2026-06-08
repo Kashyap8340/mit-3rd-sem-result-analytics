@@ -10,17 +10,18 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { StudentResult } from "@/types";
-import { Download } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { cn, getCurrentSgpa, getEffectiveCgpa } from "@/lib/utils";
+import { cn, getCurrentSgpa, getEffectiveCgpa, getSemesterIndex } from "@/lib/utils";
 
 interface ResultTableProps {
     results: StudentResult[];
     branchName: string;
+    examId?: string;
 }
 
-export function ResultTable({ results, branchName }: ResultTableProps) {
+export function ResultTable({ results, branchName, examId }: ResultTableProps) {
     // Helper to get failed papers
 
     // Helper to get failed papers
@@ -38,6 +39,47 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
     const sortedResults = [...results].sort((a, b) => {
         return getEffectiveCgpa(b) - getEffectiveCgpa(a);
     });
+
+    const generateOfficialLink = (student: StudentResult, examIdVal: string) => {
+        try {
+            const romanToOrdinal: Record<string, string> = { 
+                "I": "1st", "II": "2nd", "III": "3rd", "IV": "4th", 
+                "V": "5th", "VI": "6th", "VII": "7th", "VIII": "8th",
+                "1": "1st", "2": "2nd", "3": "3rd", "4": "4th",
+                "5": "5th", "6": "6th", "7": "7th", "8": "8th"
+            };
+            const semClean = student.semester.replace(" Semester", "").trim();
+            const semOrdinal = romanToOrdinal[semClean] || semClean;
+            const examName = `B.Tech. ${semOrdinal} Semester Examination, ${student.examYear}`;
+            
+            const semIndex = getSemesterIndex(student.semester);
+            const numericSemId = semIndex >= 0 ? semIndex + 1 : 4;
+
+            const backDObj = {
+                semester: numericSemId,
+                session: student.examYear.toString(),
+                exam_held: student.exam_held,
+                exam_id: examIdVal || ""
+            };
+            const backDBase64 = btoa(JSON.stringify(backDObj));
+
+            const dObj = {
+                name: examName,
+                semester: semClean,
+                session: student.examYear.toString(),
+                regNo: student.redg_no.toString(),
+                exam_held: student.exam_held,
+                backD: backDBase64,
+                backName: examName
+            };
+
+            const dBase64 = btoa(JSON.stringify(dObj));
+            return `https://beu-bih.ac.in/result-three?d=${encodeURIComponent(dBase64)}`;
+        } catch (e) {
+            console.error("Error generating official link:", e);
+            return "#";
+        }
+    };
 
     const exportPDF = () => {
         const doc = new jsPDF();
@@ -123,7 +165,22 @@ export function ResultTable({ results, branchName }: ResultTableProps) {
                                 return (
                                     <TableRow key={student.redg_no} className="hover:bg-muted/50 transition-colors">
                                         <TableCell className="font-medium">{index + 1}</TableCell>
-                                        <TableCell className="font-mono text-xs">{student.redg_no}</TableCell>
+                                        <TableCell className="font-mono text-xs">
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{student.redg_no}</span>
+                                                {examId && (
+                                                    <a 
+                                                        href={generateOfficialLink(student, examId)} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        title="Verify on Official BEU Site"
+                                                        className="text-accent hover:text-accent/80 transition-colors cursor-pointer inline-flex items-center"
+                                                    >
+                                                        <ExternalLink className="h-3.5 w-3.5 animate-pulse-slow" strokeWidth={2.5} />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="font-medium">{student.name}</TableCell>
                                         <TableCell>{getCurrentSgpa(student).toFixed(2) || "N/A"}</TableCell>
                                         <TableCell className="font-bold">{effectiveCgpa}</TableCell>
